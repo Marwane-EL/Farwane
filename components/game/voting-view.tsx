@@ -1,16 +1,18 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Clock, ThumbsDown, Meh, Laugh } from "lucide-react"
-import type { Meme } from "@/app/page"
+import { Clock, ThumbsDown, Meh, Laugh, Sparkles } from "lucide-react"
+import type { Meme } from "@/types/game"
 
 interface VotingViewProps {
   meme: Meme
   currentIndex: number
   totalMemes: number
-  onVote: () => void
+  onVote: (memeId: string, score: number) => void
+  onNext: () => void
+  currentPlayerId: string
 }
 
 export function VotingView({
@@ -18,36 +20,65 @@ export function VotingView({
   currentIndex,
   totalMemes,
   onVote,
+  onNext,
+  currentPlayerId,
 }: VotingViewProps) {
   const [timeLeft, setTimeLeft] = useState(15)
   const [selectedVote, setSelectedVote] = useState<string | null>(null)
   const [hasVoted, setHasVoted] = useState(false)
+  const isOwnMeme = meme.playerId === currentPlayerId
 
+  // Stable refs
+  const onVoteRef = useRef(onVote)
+  const onNextRef = useRef(onNext)
+  useEffect(() => { onVoteRef.current = onVote }, [onVote])
+  useEffect(() => { onNextRef.current = onNext }, [onNext])
+
+  // Reset state when meme changes
   useEffect(() => {
     setTimeLeft(15)
     setSelectedVote(null)
     setHasVoted(false)
   }, [currentIndex])
 
+  // Auto-skip own meme
   useEffect(() => {
+    if (isOwnMeme) {
+      const skipTimer = setTimeout(() => {
+        onNextRef.current()
+      }, 1500)
+      return () => clearTimeout(skipTimer)
+    }
+  }, [isOwnMeme, currentIndex])
+
+  // Timer
+  useEffect(() => {
+    if (isOwnMeme) return
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer)
-          onVote()
+          onNextRef.current()
           return 0
         }
         return prev - 1
       })
     }, 1000)
     return () => clearInterval(timer)
-  }, [onVote, currentIndex])
+  }, [currentIndex, isOwnMeme])
 
   const handleVote = (vote: string) => {
+    if (hasVoted || isOwnMeme) return
+    const scoreMap: Record<string, number> = { nul: 0, pasMal: 1, mdr: 3 }
+    const score = scoreMap[vote] || 0
+
     setSelectedVote(vote)
     setHasVoted(true)
+
+    onVote(meme.id, score)
+
     setTimeout(() => {
-      onVote()
+      onNext()
     }, 800)
   }
 
@@ -58,6 +89,19 @@ export function VotingView({
     { id: "pasMal", label: "Pas mal 😏", icon: Meh, color: "secondary" },
     { id: "mdr", label: "MDR 🤣", icon: Laugh, color: "accent" },
   ]
+
+  // Own meme screen
+  if (isOwnMeme) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-4 py-8">
+        <div className="text-center animate-in fade-in zoom-in-95 duration-500">
+          <Sparkles className="h-16 w-16 text-secondary mx-auto mb-4 animate-pulse" />
+          <h2 className="text-2xl font-bold mb-2">C&apos;est ton meme !</h2>
+          <p className="text-muted-foreground">Passage automatique...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center px-4 py-6">

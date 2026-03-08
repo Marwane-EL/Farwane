@@ -15,13 +15,18 @@ import {
   Image as ImageIcon,
   ChevronDown,
   ChevronUp,
-  X
+  X,
+  AlertCircle,
+  Loader2
 } from "lucide-react"
-import type { MemeLibrary } from "@/app/page"
+import type { MemeLibrary } from "@/types/game"
 
 interface HomeViewProps {
-  onCreateGame: () => void
+  onCreateGame: (pseudo: string) => void
   onJoinGame: (code: string, pseudo: string) => void
+  error: string | null
+  isLoading: boolean
+  onDismissError: () => void
   libraries: MemeLibrary[]
   onCreateLibrary: (name: string) => void
   onDeleteLibrary: (id: string) => void
@@ -32,6 +37,9 @@ interface HomeViewProps {
 export function HomeView({ 
   onCreateGame, 
   onJoinGame,
+  error,
+  isLoading,
+  onDismissError,
   libraries,
   onCreateLibrary,
   onDeleteLibrary,
@@ -40,6 +48,7 @@ export function HomeView({
 }: HomeViewProps) {
   const [joinCode, setJoinCode] = useState("")
   const [pseudo, setPseudo] = useState("")
+  const [hostPseudo, setHostPseudo] = useState("")
   const [showLibrary, setShowLibrary] = useState(false)
   const [newLibraryName, setNewLibraryName] = useState("")
   const [expandedLibrary, setExpandedLibrary] = useState<string | null>(null)
@@ -49,6 +58,13 @@ export function HomeView({
     e.preventDefault()
     if (joinCode.length === 4 && pseudo.trim()) {
       onJoinGame(joinCode.toUpperCase(), pseudo.trim())
+    }
+  }
+
+  const handleCreate = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (hostPseudo.trim()) {
+      onCreateGame(hostPseudo.trim())
     }
   }
 
@@ -82,23 +98,59 @@ export function HomeView({
           <Zap className="absolute -bottom-2 -left-4 w-6 h-6 text-accent animate-pulse" />
         </div>
         <p className="text-muted-foreground text-lg mt-4">
-          Creez des memes. Votez. Dominez.
+          Créez des memes. Votez. Dominez.
         </p>
       </div>
+
+      {/* Error message */}
+      {error && (
+        <div className="w-full max-w-4xl mb-4 animate-in fade-in duration-300">
+          <div className="flex items-center gap-3 p-4 rounded-lg bg-destructive/15 border border-destructive/30 text-destructive">
+            <AlertCircle className="h-5 w-5 shrink-0" />
+            <p className="flex-1 text-sm font-medium">{error}</p>
+            <button onClick={onDismissError} className="shrink-0 hover:opacity-70">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main content */}
       <div className="w-full max-w-4xl grid md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-200">
         {/* Left column - Game actions */}
         <div className="space-y-6">
-          {/* Create game button */}
-          <Button
-            onClick={onCreateGame}
-            size="lg"
-            className="w-full h-16 text-xl font-bold bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/30 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-primary/40"
-          >
-            <Sparkles className="mr-2 h-6 w-6" />
-            Creer une partie
-          </Button>
+          {/* Create game form */}
+          <Card className="border-2 border-border/50 bg-card/50 backdrop-blur-sm">
+            <CardContent className="p-6">
+              <form onSubmit={handleCreate} className="space-y-4">
+                <h2 className="text-lg font-semibold text-center flex items-center justify-center gap-2">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                  Créer une partie
+                </h2>
+                <Input
+                  type="text"
+                  placeholder="Ton pseudo"
+                  value={hostPseudo}
+                  onChange={(e) => { setHostPseudo(e.target.value.slice(0, 15)); onDismissError() }}
+                  className="h-12 text-center text-lg bg-muted/50 border-2 border-border focus:border-primary transition-colors"
+                  maxLength={15}
+                />
+                <Button
+                  type="submit"
+                  size="lg"
+                  disabled={!hostPseudo.trim() || isLoading}
+                  className="w-full h-14 text-xl font-bold bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/30 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-primary/40 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? (
+                    <Loader2 className="mr-2 h-6 w-6 animate-spin" />
+                  ) : (
+                    <Sparkles className="mr-2 h-6 w-6" />
+                  )}
+                  Créer une partie
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
 
           {/* Separator */}
           <div className="relative">
@@ -124,7 +176,7 @@ export function HomeView({
                     type="text"
                     placeholder="Code du salon (4 lettres)"
                     value={joinCode}
-                    onChange={(e) => setJoinCode(e.target.value.toUpperCase().slice(0, 4))}
+                    onChange={(e) => { setJoinCode(e.target.value.toUpperCase().slice(0, 4)); onDismissError() }}
                     className="h-12 text-center text-2xl font-bold tracking-[0.5em] uppercase bg-muted/50 border-2 border-border focus:border-primary transition-colors"
                     maxLength={4}
                   />
@@ -141,9 +193,14 @@ export function HomeView({
                 <Button
                   type="submit"
                   size="lg"
-                  disabled={joinCode.length !== 4 || !pseudo.trim()}
+                  disabled={joinCode.length !== 4 || !pseudo.trim() || isLoading}
                   className="w-full h-14 text-lg font-bold bg-gradient-to-r from-accent to-accent/80 text-accent-foreground hover:from-accent/90 hover:to-accent/70 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 hover:scale-[1.02]"
                 >
+                  {isLoading ? (
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  ) : (
+                    <Users className="mr-2 h-5 w-5" />
+                  )}
                   Rejoindre
                 </Button>
               </form>
@@ -160,7 +217,7 @@ export function HomeView({
             >
               <span className="flex items-center gap-2">
                 <Library className="h-5 w-5 text-secondary" />
-                Ma Bibliotheque
+                Ma Bibliothèque
               </span>
               {showLibrary ? (
                 <ChevronUp className="h-5 w-5 text-muted-foreground" />
@@ -169,7 +226,7 @@ export function HomeView({
               )}
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              Cree tes collections de memes pour les utiliser en partie
+              Crée tes collections de memes pour les utiliser en partie
             </p>
           </CardHeader>
           
@@ -201,7 +258,7 @@ export function HomeView({
                   <div className="text-center py-6 text-muted-foreground">
                     <ImageIcon className="h-12 w-12 mx-auto mb-2 opacity-50" />
                     <p className="text-sm">Aucune collection pour le moment</p>
-                    <p className="text-xs">Cree ta premiere collection ci-dessus !</p>
+                    <p className="text-xs">Crée ta première collection ci-dessus !</p>
                   </div>
                 ) : (
                   libraries.map((library) => (
@@ -285,7 +342,7 @@ export function HomeView({
                             </div>
                           ) : (
                             <p className="text-xs text-center text-muted-foreground py-2">
-                              Ajoute des memes a cette collection
+                              Ajoute des memes à cette collection
                             </p>
                           )}
                         </div>
@@ -301,7 +358,7 @@ export function HomeView({
 
       {/* Footer */}
       <p className="mt-8 text-sm text-muted-foreground animate-in fade-in duration-1000 delay-500">
-        Pret a faire rire tes potes ?
+        Prêt à faire rire tes potes ?
       </p>
     </div>
   )
