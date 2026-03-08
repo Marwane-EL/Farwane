@@ -7,9 +7,8 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'MemeClash - Créez des Memes entre Potes',
+  title: 'Farwane - Créez des Memes entre Potes',
   description: 'Jeu multijoueur de création de memes en temps réel',
-  generator: 'v0.app',
   icons: {
     icon: [
       {

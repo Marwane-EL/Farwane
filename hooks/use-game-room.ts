@@ -5,20 +5,8 @@ import { supabase } from "@/lib/supabase"
 import type { RealtimeChannel } from "@supabase/supabase-js"
 import type { Player, Meme, MemePack, MemeLibrary, GamePhase, GameSettings } from "@/types/game"
 
-const avatars = ["🎮", "🔥", "👑", "💀", "🚀", "🎲", "🎯", "⚡", "🌟", "🎪", "🦄", "🐉"]
 
-const prompts = [
-  "Quand tu réalises que c'est lundi demain...",
-  "Mon cerveau pendant un examen",
-  "La tête de mon chat quand je rentre tard",
-  "Moi essayant d'expliquer mon travail à mes parents",
-  "L'ambiance en soirée à 2h du mat",
-  "Quand le WiFi se coupe en plein stream",
-  "Mon regard quand quelqu'un dit 'c'est facile'",
-  "La tête du prof quand personne n'a fait ses devoirs",
-  "Quand tu trouves 5€ dans ta vieille veste",
-  "Le chien quand tu fais semblant de lancer la balle",
-]
+const avatars = ["🎮", "🔥", "👑", "💀", "🚀", "🎲", "🎯", "⚡", "🌟", "🎪", "🦄", "🐉"]
 
 const DEFAULT_SETTINGS: GameSettings = {
   timerDuration: 90,
@@ -39,16 +27,9 @@ function getRandomAvatar(): string {
   return avatars[Math.floor(Math.random() * avatars.length)]
 }
 
-function getRandomPrompt(used: string[]): string {
-  const available = prompts.filter((p) => !used.includes(p))
-  const pool = available.length > 0 ? available : prompts
-  return pool[Math.floor(Math.random() * pool.length)]
-}
-
 export function useGameRoom() {
   const channelRef = useRef<RealtimeChannel | null>(null)
   const playerIdRef = useRef<string>("")
-  const usedPromptsRef = useRef<string[]>([])
 
   useEffect(() => {
     let id = sessionStorage.getItem("player_id")
@@ -72,9 +53,71 @@ export function useGameRoom() {
   const [currentRound, setCurrentRound] = useState(1)
   const [playerScores, setPlayerScores] = useState<Record<string, number>>({})
 
+  // Meme packs from Supabase
+  const [memePacks, setMemePacks] = useState<MemePack[]>([])
+  const [packsLoading, setPacksLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchMemePacks() {
+      try {
+        const { data, error: fetchErr } = await supabase
+          .from("meme_packs")
+          .select("*")
+          .order("created_at", { ascending: true })
+        if (!fetchErr && data) {
+          const packs: MemePack[] = data.map((row) => ({
+            id: row.id,
+            name: row.name,
+            memes: (row.memes as string[]) || [],
+            isDefault: row.is_default,
+          }))
+
+          // Resolve Tenor page URLs → direct media URLs (with cache)
+          const allUrls = packs.flatMap((p) => p.memes)
+          const cache: Record<string, string> = JSON.parse(
+            localStorage.getItem("tenor_url_cache") || "{}"
+          )
+          const urlsToResolve = allUrls.filter(
+            (url) => url.includes("tenor.com/view/") && !cache[url]
+          )
+
+          if (urlsToResolve.length > 0) {
+            try {
+              const res = await fetch("/api/resolve-urls", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ urls: urlsToResolve }),
+              })
+              const { resolved } = await res.json()
+              urlsToResolve.forEach((url, i) => {
+                if (resolved[i] && resolved[i] !== url) {
+                  cache[url] = resolved[i]
+                }
+              })
+              localStorage.setItem("tenor_url_cache", JSON.stringify(cache))
+            } catch {
+              console.error("Failed to resolve Tenor URLs")
+            }
+          }
+
+          // Apply cache: replace Tenor page URLs with resolved media URLs
+          for (const pack of packs) {
+            pack.memes = pack.memes.map((url) => cache[url] || url)
+          }
+
+          setMemePacks(packs)
+        }
+      } catch {
+        console.error("Failed to fetch meme packs")
+      } finally {
+        setPacksLoading(false)
+      }
+    }
+    fetchMemePacks()
+  }, [])
+
   // Game state
   const [selectedPack, setSelectedPack] = useState<MemePack | null>(null)
-  const [currentPrompt, setCurrentPrompt] = useState("")
   const [currentRoundMemeIndex, setCurrentRoundMemeIndex] = useState(0)
   const [submissions, setSubmissions] = useState<Meme[]>([])
   const [currentMemeIndex, setCurrentMemeIndex] = useState(0)
@@ -131,7 +174,6 @@ export function useGameRoom() {
     channel.on("broadcast", { event: "game:start" }, ({ payload }) => {
       setPhase("creation")
       setSelectedPack(payload.pack)
-      setCurrentPrompt(payload.prompt)
       setCurrentRoundMemeIndex(payload.roundIndex)
       setSettings(payload.settings)
       setCurrentRound(1)
@@ -173,7 +215,6 @@ export function useGameRoom() {
     // Next round
     channel.on("broadcast", { event: "game:next-round" }, ({ payload }) => {
       setPhase("creation")
-      setCurrentPrompt(payload.prompt)
       setCurrentRoundMemeIndex(payload.roundIndex)
       setCurrentRound(payload.round)
       setSubmissions([])
@@ -289,11 +330,7 @@ export function useGameRoom() {
     if (!currentPlayer?.isHost || !channelRef.current || !selectedPack) return
     if (selectedPack.memes.length < 3) return
     await supabase.from("rooms").update({ status: "playing" }).eq("code", roomCode)
-    usedPromptsRef.current = []
-    const prompt = getRandomPrompt(usedPromptsRef.current)
-    usedPromptsRef.current.push(prompt)
     setPhase("creation")
-    setCurrentPrompt(prompt)
     setCurrentRoundMemeIndex(0)
     setCurrentRound(1)
     setPlayerScores({})
@@ -301,7 +338,7 @@ export function useGameRoom() {
     setHasSubmitted(false)
     channelRef.current.send({
       type: "broadcast", event: "game:start",
-      payload: { pack: selectedPack, prompt, roundIndex: 0, settings },
+      payload: { pack: selectedPack, roundIndex: 0, settings },
     })
   }, [currentPlayer, selectedPack, roomCode, settings])
 
@@ -338,20 +375,22 @@ export function useGameRoom() {
     if (currentMemeIndex < submissions.length - 1) {
       setCurrentMemeIndex((prev) => prev + 1)
     } else {
-      // All memes voted — calculate round scores
-      const newScores = { ...playerScores }
-      for (const sub of submissions) {
-        newScores[sub.playerId] = (newScores[sub.playerId] || 0) + sub.votes
-      }
-      setPlayerScores(newScores)
-      setPhase("results")
+      // Defer to avoid "cannot update component while rendering another"
+      setTimeout(() => {
+        const newScores = { ...playerScores }
+        for (const sub of submissions) {
+          newScores[sub.playerId] = (newScores[sub.playerId] || 0) + sub.votes
+        }
+        setPlayerScores(newScores)
+        setPhase("results")
 
-      if (currentPlayer?.isHost && channelRef.current) {
-        channelRef.current.send({
-          type: "broadcast", event: "game:results",
-          payload: { submissions, scores: newScores, currentRound },
-        })
-      }
+        if (currentPlayer?.isHost && channelRef.current) {
+          channelRef.current.send({
+            type: "broadcast", event: "game:results",
+            payload: { submissions, scores: newScores, currentRound },
+          })
+        }
+      }, 0)
     }
   }, [currentMemeIndex, submissions, currentPlayer, playerScores, currentRound])
 
@@ -369,10 +408,7 @@ export function useGameRoom() {
       // More rounds to play
       const nextRoundNum = currentRound + 1
       const nextMemeIdx = (currentRoundMemeIndex + 1) % selectedPack.memes.length
-      const prompt = getRandomPrompt(usedPromptsRef.current)
-      usedPromptsRef.current.push(prompt)
       setPhase("creation")
-      setCurrentPrompt(prompt)
       setCurrentRoundMemeIndex(nextMemeIdx)
       setCurrentRound(nextRoundNum)
       setSubmissions([])
@@ -380,7 +416,7 @@ export function useGameRoom() {
       setCurrentMemeIndex(0)
       channelRef.current.send({
         type: "broadcast", event: "game:next-round",
-        payload: { roundIndex: nextMemeIdx, prompt, round: nextRoundNum },
+        payload: { roundIndex: nextMemeIdx, round: nextRoundNum },
       })
     }
   }, [currentPlayer, selectedPack, currentRound, currentRoundMemeIndex, settings.totalRounds, playerScores])
@@ -395,7 +431,7 @@ export function useGameRoom() {
     setHasSubmitted(false)
     setCurrentMemeIndex(0)
     setCurrentRoundMemeIndex(0)
-    usedPromptsRef.current = []
+
     await supabase.from("rooms").update({ status: "waiting" }).eq("code", roomCode)
     channelRef.current.send({ type: "broadcast", event: "game:new-game", payload: {} })
   }, [currentPlayer, roomCode])
@@ -450,7 +486,8 @@ export function useGameRoom() {
   return {
     phase, roomCode, players, currentPlayer,
     settings, currentRound, playerScores,
-    selectedPack, currentPrompt, currentRoundMemeIndex,
+    memePacks, packsLoading,
+    selectedPack, currentRoundMemeIndex,
     submissions, currentMemeIndex, hasSubmitted,
     error, isLoading, libraries,
     createRoom, joinRoom, leaveRoom,

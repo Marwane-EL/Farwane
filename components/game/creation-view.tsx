@@ -7,7 +7,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { Clock, Send, CheckCircle, Users, Loader2 } from "lucide-react"
 
 interface CreationViewProps {
-  prompt: string
   currentMemeUrl: string
   timerDuration: number
   onSubmit: (caption: string) => void
@@ -21,7 +20,6 @@ interface CreationViewProps {
 }
 
 export function CreationView({
-  prompt,
   currentMemeUrl,
   timerDuration,
   onSubmit,
@@ -134,12 +132,12 @@ export function CreationView({
         </div>
       </div>
 
-      {/* Prompt */}
+      {/* Round info */}
       <Card className="mb-6 border-2 border-primary/50 bg-gradient-to-r from-primary/10 to-accent/10 animate-in fade-in slide-in-from-top-6 duration-500 delay-100">
         <CardContent className="p-6 text-center">
-          <p className="text-sm text-muted-foreground mb-2">Manche {currentRound}/{totalRounds} — Ton défi :</p>
+          <p className="text-sm text-muted-foreground mb-2">Manche {currentRound}/{totalRounds}</p>
           <h2 className="text-xl md:text-2xl font-bold text-foreground">
-            {'"'}{prompt}{'"'}
+            Écris la légende la plus drôle ! 😂
           </h2>
         </CardContent>
       </Card>

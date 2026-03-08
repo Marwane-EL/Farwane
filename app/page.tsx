@@ -7,39 +7,13 @@ import { VotingView } from "@/components/game/voting-view"
 import { ResultsView } from "@/components/game/results-view"
 import { FinalResultsView } from "@/components/game/final-results-view"
 import { useGameRoom } from "@/hooks/use-game-room"
-import type { MemePack } from "@/types/game"
-
-const defaultMemePacks: MemePack[] = [
-  {
-    id: "default-1",
-    name: "Memes par défaut",
-    isDefault: true,
-    memes: [
-      "https://media.giphy.com/media/JIX9t2j0ZTN9S/giphy.gif",
-      "https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif",
-      "https://media.giphy.com/media/26ufdipQqU2lhNA4g/giphy.gif",
-      "https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif",
-      "https://media.giphy.com/media/xT9IgG50Fb7Mi0prBC/giphy.gif",
-    ],
-  },
-  {
-    id: "default-2",
-    name: "Pack Reaction GIFs",
-    isDefault: true,
-    memes: [
-      "https://media.giphy.com/media/l3q2K5jinAlChoCLS/giphy.gif",
-      "https://media.giphy.com/media/LRVnPYqM8DLag/giphy.gif",
-      "https://media.giphy.com/media/3o7TKTDn976rzVgky4/giphy.gif",
-      "https://media.giphy.com/media/l0HlvtIPzPdt2usKs/giphy.gif",
-    ],
-  },
-]
 
 export default function MemeGame() {
   const {
     phase, roomCode, players, currentPlayer,
     settings, currentRound, playerScores,
-    selectedPack, currentPrompt, currentRoundMemeIndex,
+    memePacks, packsLoading,
+    selectedPack, currentRoundMemeIndex,
     submissions, currentMemeIndex, hasSubmitted,
     error, isLoading, libraries,
     createRoom, joinRoom, leaveRoom,
@@ -80,7 +54,7 @@ export default function MemeGame() {
             roomCode={roomCode}
             players={players}
             currentPlayer={currentPlayer}
-            memePacks={defaultMemePacks}
+            memePacks={memePacks}
             userLibraries={libraries}
             selectedPack={selectedPack}
             settings={settings}
@@ -92,7 +66,6 @@ export default function MemeGame() {
         )}
         {phase === "creation" && (
           <CreationView
-            prompt={currentPrompt}
             currentMemeUrl={currentMemeUrl}
             timerDuration={settings.timerDuration}
             onSubmit={submitMeme}
