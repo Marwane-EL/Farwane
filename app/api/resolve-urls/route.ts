@@ -1,32 +1,42 @@
 import { NextResponse } from "next/server"
 
-// Resolves Tenor page URLs (tenor.com/view/...) to direct media URLs (media.tenor.com/...)
+// Resolves Tenor page URLs (tenor.com/view/...) to direct GIF URLs (media.tenor.com/...)
 // Non-Tenor URLs are returned as-is.
+// Strategy: Use Tenor oEmbed API to get thumbnail, then convert to GIF format.
 
 async function resolveTenorUrl(url: string): Promise<string> {
   if (!url.includes("tenor.com/view/")) return url
 
   try {
-    const res = await fetch(url, {
+    // Use Tenor's oEmbed API — reliable and doesn't require an API key
+    const oembedUrl = `https://tenor.com/oembed?url=${encodeURIComponent(url)}`
+    const res = await fetch(oembedUrl, {
       headers: { "User-Agent": "Mozilla/5.0 (compatible; bot)" },
-      redirect: "follow",
     })
-    const html = await res.text()
 
-    // Try extracting og:image / og:video meta tag (contains the direct media URL)
-    const patterns = [
-      /<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i,
-      /<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i,
-      /<meta[^>]*property=["']og:video["'][^>]*content=["']([^"']+)["']/i,
-      /<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:video["']/i,
-      /content="(https:\/\/media\.tenor\.com\/[^"]+)"/i,
-    ]
+    if (!res.ok) return url
 
-    for (const pattern of patterns) {
-      const match = html.match(pattern)
-      if (match?.[1] && match[1].includes("media.tenor.com")) {
-        return match[1]
+    const data = await res.json()
+    const thumbnail: string | undefined = data.thumbnail_url
+
+    if (thumbnail && thumbnail.includes("media.tenor.com")) {
+      // Convert thumbnail PNG to GIF format
+      // Tenor thumbnail: https://media.tenor.com/XXAAAAN/name.png  (PNG preview)
+      // Tenor GIF:       https://media.tenor.com/XXAAAAC/name.gif  (actual GIF)
+      const gifUrl = thumbnail
+        .replace(/AAAA[A-Z]\//, "AAAAC/")
+        .replace(/\.png$/, ".gif")
+
+      // Verify the GIF URL actually works
+      try {
+        const check = await fetch(gifUrl, { method: "HEAD" })
+        if (check.ok) return gifUrl
+      } catch {
+        // If HEAD check fails, try the thumbnail as fallback
       }
+
+      // Fallback: return thumbnail (at least it's a valid image)
+      return thumbnail
     }
 
     return url
@@ -83,7 +93,7 @@ export async function POST(request: Request) {
 
       batchIdx += batch.length
 
-      // Small delay between batches to be nice to Tenor
+      // Small delay between batches
       if (batches.indexOf(batch) < batches.length - 1) {
         await new Promise((r) => setTimeout(r, 200))
       }

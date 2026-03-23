@@ -13,18 +13,18 @@ export default function MemeGame() {
     phase, roomCode, players, currentPlayer,
     settings, currentRound, playerScores,
     memePacks, packsLoading,
-    selectedPack, currentRoundMemeIndex,
+    selectedPack, myMemeUrl,
     submissions, currentMemeIndex, hasSubmitted,
+    hasVotedOnCurrent, currentVoters,
     error, isLoading, libraries,
     createRoom, joinRoom, leaveRoom,
     updateSettings, selectPack, startGame,
     submitMeme, moveToVoting, vote,
-    nextMemeOrResults, nextRound, newGame,
+    advanceMeme, nextRound, newGame,
     setError,
     createLibrary, deleteLibrary, addMemeToLibrary, removeMemeFromLibrary,
   } = useGameRoom()
 
-  const currentMemeUrl = selectedPack?.memes[currentRoundMemeIndex] || ""
 
   return (
     <main className="min-h-screen bg-background overflow-hidden">
@@ -66,7 +66,7 @@ export default function MemeGame() {
         )}
         {phase === "creation" && (
           <CreationView
-            currentMemeUrl={currentMemeUrl}
+            currentMemeUrl={myMemeUrl}
             timerDuration={settings.timerDuration}
             onSubmit={submitMeme}
             hasSubmitted={hasSubmitted}
@@ -84,8 +84,12 @@ export default function MemeGame() {
             currentIndex={currentMemeIndex}
             totalMemes={submissions.length}
             onVote={vote}
-            onNext={nextMemeOrResults}
             currentPlayerId={currentPlayer?.id || ""}
+            hasVotedOnCurrent={hasVotedOnCurrent}
+            votedCount={currentVoters.length}
+            totalPlayers={players.length}
+            isHost={currentPlayer?.isHost || false}
+            onForceAdvance={advanceMeme}
           />
         )}
         {phase === "results" && (

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { Clock, Send, CheckCircle, Users, Loader2 } from "lucide-react"
+import { MemeMedia } from "@/components/game/meme-media"
 
 interface CreationViewProps {
   currentMemeUrl: string
@@ -149,8 +150,7 @@ export function CreationView({
           <CardContent className="p-6 flex flex-col items-center">
             <p className="text-sm text-muted-foreground mb-4">Image imposée pour cette manche :</p>
             <div className="relative w-full max-w-md aspect-square rounded-xl overflow-hidden bg-muted/30 border-2 border-border/50">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <MemeMedia
                 src={currentMemeUrl}
                 alt="Meme imposé"
                 className="w-full h-full object-contain"

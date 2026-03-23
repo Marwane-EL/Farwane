@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Trophy, Medal, Award, RotateCcw, Home, Sparkles, Loader2, Star } from "lucide-react"
+import { MemeMedia } from "@/components/game/meme-media"
 import type { Meme, Player } from "@/types/game"
 
 interface ResultsViewProps {
@@ -63,8 +64,7 @@ export function ResultsView({
               <Card className={`w-28 md:w-40 border-2 ${config.borderColor} ${config.bgColor} backdrop-blur-sm mb-2 transition-transform hover:scale-105`}>
                 <CardContent className="p-3 md:p-4 text-center">
                   <div className="w-full aspect-square rounded-lg overflow-hidden mb-2 bg-muted/50">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={meme.imageUrl} alt={`Meme de ${meme.playerPseudo}`} className="w-full h-full object-cover" />
+                    <MemeMedia src={meme.imageUrl} alt={`Meme de ${meme.playerPseudo}`} className="w-full h-full object-cover" />
                   </div>
                   <p className="font-bold text-sm md:text-base truncate">{meme.playerPseudo}</p>
                   <p className="text-xs text-muted-foreground truncate mt-1">{meme.caption}</p>

@@ -27,9 +27,36 @@ function getRandomAvatar(): string {
   return avatars[Math.floor(Math.random() * avatars.length)]
 }
 
+// Assign a unique random meme to each player, avoiding recently used ones
+function assignRandomMemes(
+  playerIds: string[],
+  allMemes: string[],
+  usedUrls: Set<string>
+): Record<string, string> {
+  let available = allMemes.filter((url) => !usedUrls.has(url))
+  // Reset if not enough available
+  if (available.length < playerIds.length) {
+    usedUrls.clear()
+    available = [...allMemes]
+  }
+  // Shuffle (Fisher-Yates)
+  const shuffled = [...available]
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  }
+  const assignments: Record<string, string> = {}
+  playerIds.forEach((id, i) => {
+    assignments[id] = shuffled[i % shuffled.length]
+    usedUrls.add(shuffled[i % shuffled.length])
+  })
+  return assignments
+}
+
 export function useGameRoom() {
   const channelRef = useRef<RealtimeChannel | null>(null)
   const playerIdRef = useRef<string>("")
+  const usedMemeUrlsRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     let id = sessionStorage.getItem("player_id")
@@ -118,10 +145,14 @@ export function useGameRoom() {
 
   // Game state
   const [selectedPack, setSelectedPack] = useState<MemePack | null>(null)
-  const [currentRoundMemeIndex, setCurrentRoundMemeIndex] = useState(0)
+  const [myMemeUrl, setMyMemeUrl] = useState("")
   const [submissions, setSubmissions] = useState<Meme[]>([])
   const [currentMemeIndex, setCurrentMemeIndex] = useState(0)
   const [hasSubmitted, setHasSubmitted] = useState(false)
+
+  // Synced voting state
+  const [hasVotedOnCurrent, setHasVotedOnCurrent] = useState(false)
+  const [currentVoters, setCurrentVoters] = useState<string[]>([])
 
   // Libraries (persisted in localStorage)
   const [libraries, setLibraries] = useState<MemeLibrary[]>([])
@@ -174,7 +205,7 @@ export function useGameRoom() {
     channel.on("broadcast", { event: "game:start" }, ({ payload }) => {
       setPhase("creation")
       setSelectedPack(payload.pack)
-      setCurrentRoundMemeIndex(payload.roundIndex)
+      setMyMemeUrl(payload.assignments[playerIdRef.current] || "")
       setSettings(payload.settings)
       setCurrentRound(1)
       setPlayerScores({})
@@ -195,6 +226,8 @@ export function useGameRoom() {
       setPhase("voting")
       setSubmissions(payload.submissions)
       setCurrentMemeIndex(0)
+      setHasVotedOnCurrent(false)
+      setCurrentVoters([])
     })
 
     // Vote received
@@ -202,6 +235,14 @@ export function useGameRoom() {
       setSubmissions((prev) =>
         prev.map((m) => (m.id === payload.memeId ? { ...m, votes: m.votes + payload.score } : m))
       )
+      setCurrentVoters((prev) => prev.includes(payload.voterId) ? prev : [...prev, payload.voterId])
+    })
+
+    // Host advances everyone to next meme
+    channel.on("broadcast", { event: "game:advance-meme" }, ({ payload }) => {
+      setCurrentMemeIndex(payload.nextIndex)
+      setHasVotedOnCurrent(false)
+      setCurrentVoters([])
     })
 
     // Round results (with scores)
@@ -215,7 +256,7 @@ export function useGameRoom() {
     // Next round
     channel.on("broadcast", { event: "game:next-round" }, ({ payload }) => {
       setPhase("creation")
-      setCurrentRoundMemeIndex(payload.roundIndex)
+      setMyMemeUrl(payload.assignments[playerIdRef.current] || "")
       setCurrentRound(payload.round)
       setSubmissions([])
       setHasSubmitted(false)
@@ -237,7 +278,7 @@ export function useGameRoom() {
       setSelectedPack(null)
       setHasSubmitted(false)
       setCurrentMemeIndex(0)
-      setCurrentRoundMemeIndex(0)
+      setMyMemeUrl("")
     })
 
     channel.subscribe(async (status) => {
@@ -330,52 +371,68 @@ export function useGameRoom() {
     if (!currentPlayer?.isHost || !channelRef.current || !selectedPack) return
     if (selectedPack.memes.length < 3) return
     await supabase.from("rooms").update({ status: "playing" }).eq("code", roomCode)
+    usedMemeUrlsRef.current.clear()
+    const playerIds = players.map((p) => p.id)
+    const assignments = assignRandomMemes(playerIds, selectedPack.memes, usedMemeUrlsRef.current)
+    setMyMemeUrl(assignments[playerIdRef.current] || "")
     setPhase("creation")
-    setCurrentRoundMemeIndex(0)
     setCurrentRound(1)
     setPlayerScores({})
     setSubmissions([])
     setHasSubmitted(false)
     channelRef.current.send({
       type: "broadcast", event: "game:start",
-      payload: { pack: selectedPack, roundIndex: 0, settings },
+      payload: { pack: selectedPack, assignments, settings },
     })
-  }, [currentPlayer, selectedPack, roomCode, settings])
+  }, [currentPlayer, selectedPack, roomCode, settings, players])
 
   const submitMeme = useCallback((caption: string) => {
     if (!channelRef.current || !currentPlayer || hasSubmitted) return
     const meme: Meme = {
       id: crypto.randomUUID(), playerId: currentPlayer.id,
       playerPseudo: currentPlayer.pseudo,
-      imageUrl: selectedPack?.memes[currentRoundMemeIndex] || "",
+      imageUrl: myMemeUrl,
       caption, votes: 0,
     }
     setHasSubmitted(true)
     setSubmissions((prev) => [...prev, meme])
     channelRef.current.send({ type: "broadcast", event: "game:submit", payload: { meme } })
-  }, [currentPlayer, selectedPack, currentRoundMemeIndex, hasSubmitted])
+  }, [currentPlayer, myMemeUrl, hasSubmitted])
 
   const moveToVoting = useCallback(() => {
     if (!currentPlayer?.isHost || !channelRef.current) return
     setPhase("voting")
     setCurrentMemeIndex(0)
+    setHasVotedOnCurrent(false)
+    setCurrentVoters([])
     channelRef.current.send({ type: "broadcast", event: "game:voting", payload: { submissions } })
   }, [currentPlayer, submissions])
 
   const vote = useCallback((memeId: string, score: number) => {
-    if (!channelRef.current || !currentPlayer) return
+    if (!channelRef.current || !currentPlayer || hasVotedOnCurrent) return
+    setHasVotedOnCurrent(true)
+    setCurrentVoters((prev) => [...prev, currentPlayer.id])
     setSubmissions((prev) => prev.map((m) => (m.id === memeId ? { ...m, votes: m.votes + score } : m)))
     channelRef.current.send({
       type: "broadcast", event: "game:vote",
       payload: { memeId, score, voterId: currentPlayer.id },
     })
-  }, [currentPlayer])
+  }, [currentPlayer, hasVotedOnCurrent])
 
-  const nextMemeOrResults = useCallback(() => {
+  // Host: advance to next meme (used by auto-advance and force-advance)
+  const advanceMeme = useCallback(() => {
+    if (!currentPlayer?.isHost || !channelRef.current) return
     if (currentMemeIndex < submissions.length - 1) {
-      setCurrentMemeIndex((prev) => prev + 1)
+      const nextIdx = currentMemeIndex + 1
+      setCurrentMemeIndex(nextIdx)
+      setHasVotedOnCurrent(false)
+      setCurrentVoters([])
+      channelRef.current.send({
+        type: "broadcast", event: "game:advance-meme",
+        payload: { nextIndex: nextIdx },
+      })
     } else {
-      // Defer to avoid "cannot update component while rendering another"
+      // Last meme → results
       setTimeout(() => {
         const newScores = { ...playerScores }
         for (const sub of submissions) {
@@ -383,16 +440,33 @@ export function useGameRoom() {
         }
         setPlayerScores(newScores)
         setPhase("results")
-
-        if (currentPlayer?.isHost && channelRef.current) {
-          channelRef.current.send({
-            type: "broadcast", event: "game:results",
-            payload: { submissions, scores: newScores, currentRound },
-          })
-        }
+        channelRef.current?.send({
+          type: "broadcast", event: "game:results",
+          payload: { submissions, scores: newScores, currentRound },
+        })
       }, 0)
     }
-  }, [currentMemeIndex, submissions, currentPlayer, playerScores, currentRound])
+  }, [currentPlayer, currentMemeIndex, submissions, playerScores, currentRound])
+
+  // Host auto-advance: when all eligible players have voted
+  useEffect(() => {
+    if (phase !== "voting" || !currentPlayer?.isHost) return
+    const currentMeme = submissions[currentMemeIndex]
+    if (!currentMeme) return
+    const eligibleVoters = players.filter((p) => p.id !== currentMeme.playerId).length
+    if (eligibleVoters > 0 && currentVoters.length >= eligibleVoters) {
+      // Small delay so last voter sees their vote registered
+      const timer = setTimeout(() => advanceMeme(), 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [phase, currentPlayer, submissions, currentMemeIndex, currentVoters, players, advanceMeme])
+
+  // Host fallback timer: advance after 20s even if not all voted
+  useEffect(() => {
+    if (phase !== "voting" || !currentPlayer?.isHost) return
+    const timer = setTimeout(() => advanceMeme(), 20000)
+    return () => clearTimeout(timer)
+  }, [phase, currentPlayer, currentMemeIndex, advanceMeme])
 
   const nextRound = useCallback(() => {
     if (!currentPlayer?.isHost || !channelRef.current || !selectedPack) return
@@ -407,19 +481,20 @@ export function useGameRoom() {
     } else {
       // More rounds to play
       const nextRoundNum = currentRound + 1
-      const nextMemeIdx = (currentRoundMemeIndex + 1) % selectedPack.memes.length
+      const playerIds = players.map((p) => p.id)
+      const assignments = assignRandomMemes(playerIds, selectedPack.memes, usedMemeUrlsRef.current)
+      setMyMemeUrl(assignments[playerIdRef.current] || "")
       setPhase("creation")
-      setCurrentRoundMemeIndex(nextMemeIdx)
       setCurrentRound(nextRoundNum)
       setSubmissions([])
       setHasSubmitted(false)
       setCurrentMemeIndex(0)
       channelRef.current.send({
         type: "broadcast", event: "game:next-round",
-        payload: { roundIndex: nextMemeIdx, round: nextRoundNum },
+        payload: { assignments, round: nextRoundNum },
       })
     }
-  }, [currentPlayer, selectedPack, currentRound, currentRoundMemeIndex, settings.totalRounds, playerScores])
+  }, [currentPlayer, selectedPack, currentRound, settings.totalRounds, playerScores, players])
 
   const newGame = useCallback(async () => {
     if (!currentPlayer?.isHost || !channelRef.current) return
@@ -430,8 +505,8 @@ export function useGameRoom() {
     setSelectedPack(null)
     setHasSubmitted(false)
     setCurrentMemeIndex(0)
-    setCurrentRoundMemeIndex(0)
-
+    setMyMemeUrl("")
+    usedMemeUrlsRef.current.clear()
     await supabase.from("rooms").update({ status: "waiting" }).eq("code", roomCode)
     channelRef.current.send({ type: "broadcast", event: "game:new-game", payload: {} })
   }, [currentPlayer, roomCode])
@@ -452,7 +527,7 @@ export function useGameRoom() {
     setSelectedPack(null)
     setSubmissions([])
     setCurrentMemeIndex(0)
-    setCurrentRoundMemeIndex(0)
+    setMyMemeUrl("")
     setHasSubmitted(false)
     setError(null)
     setCurrentRound(1)
@@ -487,13 +562,14 @@ export function useGameRoom() {
     phase, roomCode, players, currentPlayer,
     settings, currentRound, playerScores,
     memePacks, packsLoading,
-    selectedPack, currentRoundMemeIndex,
+    selectedPack, myMemeUrl,
     submissions, currentMemeIndex, hasSubmitted,
+    hasVotedOnCurrent, currentVoters,
     error, isLoading, libraries,
     createRoom, joinRoom, leaveRoom,
     updateSettings, selectPack, startGame,
     submitMeme, moveToVoting, vote,
-    nextMemeOrResults, nextRound, newGame,
+    advanceMeme, nextRound, newGame,
     setError,
     createLibrary, deleteLibrary, addMemeToLibrary, removeMemeFromLibrary,
   }

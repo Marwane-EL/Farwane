@@ -1,9 +1,10 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Clock, ThumbsDown, Meh, Laugh, Sparkles } from "lucide-react"
+import { Clock, ThumbsDown, Meh, Laugh, Sparkles, Users, SkipForward } from "lucide-react"
+import { MemeMedia } from "@/components/game/meme-media"
 import type { Meme } from "@/types/game"
 
 interface VotingViewProps {
@@ -11,8 +12,12 @@ interface VotingViewProps {
   currentIndex: number
   totalMemes: number
   onVote: (memeId: string, score: number) => void
-  onNext: () => void
   currentPlayerId: string
+  hasVotedOnCurrent: boolean
+  votedCount: number
+  totalPlayers: number
+  isHost: boolean
+  onForceAdvance: () => void
 }
 
 export function VotingView({
@@ -20,66 +25,39 @@ export function VotingView({
   currentIndex,
   totalMemes,
   onVote,
-  onNext,
   currentPlayerId,
+  hasVotedOnCurrent,
+  votedCount,
+  totalPlayers,
+  isHost,
+  onForceAdvance,
 }: VotingViewProps) {
-  const [timeLeft, setTimeLeft] = useState(15)
+  const [timeLeft, setTimeLeft] = useState(20)
   const [selectedVote, setSelectedVote] = useState<string | null>(null)
-  const [hasVoted, setHasVoted] = useState(false)
   const isOwnMeme = meme.playerId === currentPlayerId
-
-  // Stable refs
-  const onVoteRef = useRef(onVote)
-  const onNextRef = useRef(onNext)
-  useEffect(() => { onVoteRef.current = onVote }, [onVote])
-  useEffect(() => { onNextRef.current = onNext }, [onNext])
+  const eligibleVoters = totalPlayers - 1 // everyone except the creator
 
   // Reset state when meme changes
   useEffect(() => {
-    setTimeLeft(15)
+    setTimeLeft(20)
     setSelectedVote(null)
-    setHasVoted(false)
   }, [currentIndex])
 
-  // Auto-skip own meme
-  useEffect(() => {
-    if (isOwnMeme) {
-      const skipTimer = setTimeout(() => {
-        onNextRef.current()
-      }, 1500)
-      return () => clearTimeout(skipTimer)
-    }
-  }, [isOwnMeme, currentIndex])
-
-  // Timer
+  // Visual timer (purely decorative — host controls actual advancement)
   useEffect(() => {
     if (isOwnMeme) return
     const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer)
-          onNextRef.current()
-          return 0
-        }
-        return prev - 1
-      })
+      setTimeLeft((prev) => (prev <= 0 ? 0 : prev - 1))
     }, 1000)
     return () => clearInterval(timer)
   }, [currentIndex, isOwnMeme])
 
   const handleVote = (vote: string) => {
-    if (hasVoted || isOwnMeme) return
+    if (hasVotedOnCurrent || isOwnMeme) return
     const scoreMap: Record<string, number> = { nul: 0, pasMal: 1, mdr: 3 }
     const score = scoreMap[vote] || 0
-
     setSelectedVote(vote)
-    setHasVoted(true)
-
     onVote(meme.id, score)
-
-    setTimeout(() => {
-      onNext()
-    }, 800)
   }
 
   const isUrgent = timeLeft <= 5
@@ -90,18 +68,8 @@ export function VotingView({
     { id: "mdr", label: "MDR 🤣", icon: Laugh, color: "accent" },
   ]
 
-  // Own meme screen
-  if (isOwnMeme) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-4 py-8">
-        <div className="text-center animate-in fade-in zoom-in-95 duration-500">
-          <Sparkles className="h-16 w-16 text-secondary mx-auto mb-4 animate-pulse" />
-          <h2 className="text-2xl font-bold mb-2">C&apos;est ton meme !</h2>
-          <p className="text-muted-foreground">Passage automatique...</p>
-        </div>
-      </div>
-    )
-  }
+  // Own meme screen — waiting for others to vote
+  // No early return for own meme anymore — we show the same UI but block voting
 
   return (
     <div className="min-h-screen flex flex-col items-center px-4 py-6">
@@ -111,15 +79,21 @@ export function VotingView({
           <p className="text-sm text-muted-foreground">
             Meme {currentIndex + 1}/{totalMemes}
           </p>
-          <div
-            className={`flex items-center gap-2 px-4 py-2 rounded-full border-2 transition-all duration-300 ${
-              isUrgent
-                ? "bg-destructive/20 border-destructive text-destructive animate-pulse"
-                : "bg-muted/50 border-border"
-            }`}
-          >
-            <Clock className={`h-5 w-5 ${isUrgent ? "animate-bounce" : ""}`} />
-            <span className="text-2xl font-black font-mono">{timeLeft}s</span>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+              <Users className="h-4 w-4" />
+              <span>{votedCount}/{eligibleVoters}</span>
+            </div>
+            <div
+              className={`flex items-center gap-2 px-4 py-2 rounded-full border-2 transition-all duration-300 ${
+                isUrgent
+                  ? "bg-destructive/20 border-destructive text-destructive animate-pulse"
+                  : "bg-muted/50 border-border"
+              }`}
+            >
+              <Clock className={`h-5 w-5 ${isUrgent ? "animate-bounce" : ""}`} />
+              <span className="text-2xl font-black font-mono">{timeLeft}s</span>
+            </div>
           </div>
         </div>
 
@@ -138,8 +112,7 @@ export function VotingView({
           <div className="flex flex-col items-center">
             {/* Meme image */}
             <div className="relative w-full max-w-md aspect-square flex items-center justify-center bg-muted/30 rounded-xl overflow-hidden mb-4">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <MemeMedia
                 src={meme.imageUrl}
                 alt="Meme"
                 className="max-h-full max-w-full object-contain"
@@ -161,42 +134,70 @@ export function VotingView({
         </CardContent>
       </Card>
 
-      {/* Vote buttons */}
-      <div className="flex flex-wrap justify-center gap-4 animate-in fade-in slide-in-from-bottom-6 duration-500 delay-200">
-        {voteOptions.map((option) => {
-          const Icon = option.icon
-          const isSelected = selectedVote === option.id
-          
-          return (
+      {/* Vote buttons or waiting state */}
+      {isOwnMeme ? (
+        <div className="text-center animate-in fade-in duration-300">
+          <p className="text-xl font-bold text-secondary mb-2">C&apos;est ta légende ! 😏</p>
+          <p className="text-sm text-muted-foreground mb-4">Les autres joueurs sont en train de voter...</p>
+          {isHost && (
             <Button
-              key={option.id}
-              onClick={() => handleVote(option.id)}
-              disabled={hasVoted}
-              size="lg"
-              variant={isSelected ? "default" : "outline"}
-              className={`
-                h-16 px-8 text-lg font-bold border-2 transition-all duration-300
-                ${isSelected ? "scale-110" : "hover:scale-105"}
-                ${option.color === "destructive" && "hover:bg-destructive/20 hover:border-destructive hover:text-destructive"}
-                ${option.color === "secondary" && "hover:bg-secondary/20 hover:border-secondary hover:text-secondary"}
-                ${option.color === "accent" && "hover:bg-accent/20 hover:border-accent hover:text-accent"}
-                ${isSelected && option.color === "destructive" && "bg-destructive text-destructive-foreground border-destructive"}
-                ${isSelected && option.color === "secondary" && "bg-secondary text-secondary-foreground border-secondary"}
-                ${isSelected && option.color === "accent" && "bg-accent text-accent-foreground border-accent"}
-                disabled:opacity-70
-              `}
+              onClick={onForceAdvance}
+              variant="outline"
+              size="sm"
+              className="mt-4 border-2"
             >
-              <Icon className="mr-2 h-6 w-6" />
-              {option.label}
+              <SkipForward className="mr-2 h-4 w-4" />
+              Forcer le passage
             </Button>
-          )
-        })}
-      </div>
+          )}
+        </div>
+      ) : hasVotedOnCurrent ? (
+        <div className="text-center animate-in fade-in duration-300">
+          <p className="text-lg text-primary mb-2">Vote enregistré ! ✨</p>
+          <p className="text-sm text-muted-foreground">En attente des autres joueurs...</p>
+          {isHost && (
+            <Button
+              onClick={onForceAdvance}
+              variant="outline"
+              size="sm"
+              className="mt-4 border-2"
+            >
+              <SkipForward className="mr-2 h-4 w-4" />
+              Forcer le passage
+            </Button>
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-wrap justify-center gap-4 animate-in fade-in slide-in-from-bottom-6 duration-500 delay-200">
+          {voteOptions.map((option) => {
+            const Icon = option.icon
+            const isSelected = selectedVote === option.id
 
-      {hasVoted && (
-        <p className="mt-6 text-lg text-primary animate-in fade-in duration-300">
-          Vote enregistré ! ✨
-        </p>
+            return (
+              <Button
+                key={option.id}
+                onClick={() => handleVote(option.id)}
+                disabled={hasVotedOnCurrent || isOwnMeme}
+                size="lg"
+                variant={isSelected ? "default" : "outline"}
+                className={`
+                  h-16 px-8 text-lg font-bold border-2 transition-all duration-300
+                  ${isSelected ? "scale-110" : "hover:scale-105"}
+                  ${option.color === "destructive" && "hover:bg-destructive/20 hover:border-destructive hover:text-destructive"}
+                  ${option.color === "secondary" && "hover:bg-secondary/20 hover:border-secondary hover:text-secondary"}
+                  ${option.color === "accent" && "hover:bg-accent/20 hover:border-accent hover:text-accent"}
+                  ${isSelected && option.color === "destructive" && "bg-destructive text-destructive-foreground border-destructive"}
+                  ${isSelected && option.color === "secondary" && "bg-secondary text-secondary-foreground border-secondary"}
+                  ${isSelected && option.color === "accent" && "bg-accent text-accent-foreground border-accent"}
+                  disabled:opacity-70
+                `}
+              >
+                <Icon className="mr-2 h-6 w-6" />
+                {option.label}
+              </Button>
+            )
+          })}
+        </div>
       )}
     </div>
   )
