@@ -21,6 +21,7 @@ export default function MemeGame() {
     updateSettings, selectPack, startGame,
     submitMeme, moveToVoting, vote,
     advanceMeme, nextRound, newGame,
+    refreshMeme, refreshesLeft,
     setError,
     createLibrary, deleteLibrary, addMemeToLibrary, removeMemeFromLibrary,
   } = useGameRoom()
@@ -76,6 +77,8 @@ export default function MemeGame() {
             onForceVoting={moveToVoting}
             currentRound={currentRound}
             totalRounds={settings.totalRounds}
+            onRefreshMeme={refreshMeme}
+            refreshesLeft={refreshesLeft}
           />
         )}
         {phase === "voting" && submissions.length > 0 && (

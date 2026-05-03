@@ -149,6 +149,7 @@ export function useGameRoom() {
   const [submissions, setSubmissions] = useState<Meme[]>([])
   const [currentMemeIndex, setCurrentMemeIndex] = useState(0)
   const [hasSubmitted, setHasSubmitted] = useState(false)
+  const [refreshesLeft, setRefreshesLeft] = useState(5)
 
   // Synced voting state
   const [hasVotedOnCurrent, setHasVotedOnCurrent] = useState(false)
@@ -211,6 +212,7 @@ export function useGameRoom() {
       setPlayerScores({})
       setSubmissions([])
       setHasSubmitted(false)
+      setRefreshesLeft(5)
     })
 
     // Meme submitted
@@ -260,6 +262,7 @@ export function useGameRoom() {
       setCurrentRound(payload.round)
       setSubmissions([])
       setHasSubmitted(false)
+      setRefreshesLeft(5)
       setCurrentMemeIndex(0)
     })
 
@@ -380,6 +383,7 @@ export function useGameRoom() {
     setPlayerScores({})
     setSubmissions([])
     setHasSubmitted(false)
+    setRefreshesLeft(5)
     channelRef.current.send({
       type: "broadcast", event: "game:start",
       payload: { pack: selectedPack, assignments, settings },
@@ -488,6 +492,7 @@ export function useGameRoom() {
       setCurrentRound(nextRoundNum)
       setSubmissions([])
       setHasSubmitted(false)
+      setRefreshesLeft(5)
       setCurrentMemeIndex(0)
       channelRef.current.send({
         type: "broadcast", event: "game:next-round",
@@ -558,6 +563,24 @@ export function useGameRoom() {
     return () => { if (channelRef.current) supabase.removeChannel(channelRef.current) }
   }, [])
 
+  // Refresh meme functionality
+  const refreshMeme = useCallback(() => {
+    if (refreshesLeft <= 0 || !selectedPack || hasSubmitted) return
+
+    let available = selectedPack.memes.filter(
+      (url) => !usedMemeUrlsRef.current.has(url) && url !== myMemeUrl
+    )
+    if (available.length === 0) {
+      available = selectedPack.memes.filter((url) => url !== myMemeUrl)
+      if (available.length === 0) available = selectedPack.memes
+    }
+
+    const newMemeUrl = available[Math.floor(Math.random() * available.length)]
+    usedMemeUrlsRef.current.add(newMemeUrl)
+    setMyMemeUrl(newMemeUrl)
+    setRefreshesLeft((prev) => prev - 1)
+  }, [refreshesLeft, selectedPack, myMemeUrl, hasSubmitted])
+
   return {
     phase, roomCode, players, currentPlayer,
     settings, currentRound, playerScores,
@@ -570,6 +593,7 @@ export function useGameRoom() {
     updateSettings, selectPack, startGame,
     submitMeme, moveToVoting, vote,
     advanceMeme, nextRound, newGame,
+    refreshMeme, refreshesLeft,
     setError,
     createLibrary, deleteLibrary, addMemeToLibrary, removeMemeFromLibrary,
   }

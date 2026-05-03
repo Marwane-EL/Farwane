@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
-import { Clock, Send, CheckCircle, Users, Loader2 } from "lucide-react"
+import { Clock, Send, CheckCircle, Users, Loader2, RefreshCw } from "lucide-react"
 import { MemeMedia } from "@/components/game/meme-media"
 
 interface CreationViewProps {
@@ -18,6 +18,8 @@ interface CreationViewProps {
   onForceVoting: () => void
   currentRound: number
   totalRounds: number
+  onRefreshMeme: () => void
+  refreshesLeft: number
 }
 
 export function CreationView({
@@ -31,6 +33,8 @@ export function CreationView({
   onForceVoting,
   currentRound,
   totalRounds,
+  onRefreshMeme,
+  refreshesLeft,
 }: CreationViewProps) {
   const [timeLeft, setTimeLeft] = useState(timerDuration)
   const [caption, setCaption] = useState("")
@@ -148,7 +152,21 @@ export function CreationView({
         {/* Imposed Meme Image */}
         <Card className="w-full border-2 border-border/50 bg-card/50 backdrop-blur-sm mb-6">
           <CardContent className="p-6 flex flex-col items-center">
-            <p className="text-sm text-muted-foreground mb-4">Image imposée pour cette manche :</p>
+            <div className="w-full flex justify-between items-center mb-4 px-2">
+              <p className="text-sm text-muted-foreground">Image imposée pour cette manche :</p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onRefreshMeme}
+                disabled={refreshesLeft <= 0 || hasSubmitted}
+                title="Changer d'image"
+                className="gap-2"
+              >
+                <RefreshCw className="h-4 w-4" />
+                <span className="hidden sm:inline">Changer</span>
+                <span className="text-xs text-muted-foreground ml-1">({refreshesLeft})</span>
+              </Button>
+            </div>
             <div className="relative w-full max-w-md aspect-square rounded-xl overflow-hidden bg-muted/30 border-2 border-border/50">
               <MemeMedia
                 src={currentMemeUrl}
