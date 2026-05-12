@@ -465,6 +465,16 @@ export function useGameRoom() {
     }
   }, [phase, currentPlayer, submissions, currentMemeIndex, currentVoters, players, advanceMeme])
 
+  // Host auto-advance: when all players have submitted their memes
+  useEffect(() => {
+    if (phase !== "creation" || !currentPlayer?.isHost) return
+    if (submissions.length > 0 && submissions.length >= players.length) {
+      // Small delay before moving to voting
+      const timer = setTimeout(() => moveToVoting(), 2000)
+      return () => clearTimeout(timer)
+    }
+  }, [phase, currentPlayer, submissions.length, players.length, moveToVoting])
+
   // Host fallback timer: advance after 20s even if not all voted
   useEffect(() => {
     if (phase !== "voting" || !currentPlayer?.isHost) return

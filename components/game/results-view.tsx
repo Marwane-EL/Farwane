@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Trophy, Medal, Award, RotateCcw, Home, Sparkles, Loader2, Star } from "lucide-react"
 import { MemeMedia } from "@/components/game/meme-media"
+import { DownloadMemeButton } from "@/components/game/download-meme-button"
 import type { Meme, Player } from "@/types/game"
 
 interface ResultsViewProps {
@@ -61,8 +62,11 @@ export function ResultsView({
           const Icon = config.icon
           return (
             <div key={meme.id} className="flex flex-col items-center animate-in fade-in zoom-in-95 duration-500" style={{ animationDelay: `${(visualIndex + 1) * 200}ms` }}>
-              <Card className={`w-28 md:w-40 border-2 ${config.borderColor} ${config.bgColor} backdrop-blur-sm mb-2 transition-transform hover:scale-105`}>
-                <CardContent className="p-3 md:p-4 text-center">
+              <Card className={`w-28 md:w-40 border-2 ${config.borderColor} ${config.bgColor} backdrop-blur-sm mb-2 transition-transform hover:scale-105 relative group`}>
+                <CardContent className="p-3 md:p-4 text-center relative">
+                  <div className="absolute -top-3 -right-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                    <DownloadMemeButton meme={meme} className="h-8 w-8" />
+                  </div>
                   <div className="w-full aspect-square rounded-lg overflow-hidden mb-2 bg-muted/50">
                     <MemeMedia src={meme.imageUrl} alt={`Meme de ${meme.playerPseudo}`} className="w-full h-full object-cover" />
                   </div>

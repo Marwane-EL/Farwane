@@ -136,11 +136,10 @@ export function LobbyView({
                       size="sm"
                       variant={settings.timerDuration === t ? "default" : "outline"}
                       onClick={() => onUpdateSettings({ ...settings, timerDuration: t })}
-                      className={`flex-1 h-9 font-bold transition-all ${
-                        settings.timerDuration === t
+                      className={`flex-1 h-9 font-bold transition-all ${settings.timerDuration === t
                           ? "bg-secondary text-secondary-foreground shadow-md"
                           : "hover:border-secondary"
-                      }`}
+                        }`}
                     >
                       {t}s
                     </Button>
@@ -161,11 +160,10 @@ export function LobbyView({
                       size="sm"
                       variant={settings.totalRounds === r ? "default" : "outline"}
                       onClick={() => onUpdateSettings({ ...settings, totalRounds: r })}
-                      className={`flex-1 h-9 font-bold transition-all ${
-                        settings.totalRounds === r
+                      className={`flex-1 h-9 font-bold transition-all ${settings.totalRounds === r
                           ? "bg-secondary text-secondary-foreground shadow-md"
                           : "hover:border-secondary"
-                      }`}
+                        }`}
                     >
                       {r}
                     </Button>

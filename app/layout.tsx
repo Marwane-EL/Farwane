@@ -10,21 +10,8 @@ export const metadata: Metadata = {
   title: 'Farwane - Créez des Memes entre Potes',
   description: 'Jeu multijoueur de création de memes en temps réel',
   icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
-    apple: '/apple-icon.png',
+    icon: '/farwaneLogoDark.png',
+    apple: '/farwaneLogo.png',
   },
 }
 

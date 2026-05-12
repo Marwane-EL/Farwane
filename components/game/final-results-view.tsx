@@ -71,23 +71,20 @@ export function FinalResultsView({
             {leaderboard.map((player, i) => (
               <div
                 key={player.id}
-                className={`flex items-center gap-4 px-4 py-3 rounded-xl border-2 transition-all duration-300 animate-in fade-in slide-in-from-left-4 ${
-                  i < 3 ? rankStyles[i] : "border-border/50 bg-muted/20"
-                }`}
+                className={`flex items-center gap-4 px-4 py-3 rounded-xl border-2 transition-all duration-300 animate-in fade-in slide-in-from-left-4 ${i < 3 ? rankStyles[i] : "border-border/50 bg-muted/20"
+                  }`}
                 style={{ animationDelay: `${(i + 3) * 100}ms` }}
               >
-                <span className={`text-2xl font-black w-8 ${
-                  i === 0 ? "text-yellow-400" : i === 1 ? "text-gray-300" : i === 2 ? "text-orange-400" : "text-muted-foreground"
-                }`}>
+                <span className={`text-2xl font-black w-8 ${i === 0 ? "text-yellow-400" : i === 1 ? "text-gray-300" : i === 2 ? "text-orange-400" : "text-muted-foreground"
+                  }`}>
                   {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`}
                 </span>
                 <span className="text-3xl">{player.avatar}</span>
                 <div className="flex-1">
                   <p className="font-bold text-lg">{player.pseudo}</p>
                 </div>
-                <span className={`text-xl font-black ${
-                  i === 0 ? "text-yellow-400" : i === 1 ? "text-gray-300" : i === 2 ? "text-orange-400" : "text-primary"
-                }`}>
+                <span className={`text-xl font-black ${i === 0 ? "text-yellow-400" : i === 1 ? "text-gray-300" : i === 2 ? "text-orange-400" : "text-primary"
+                  }`}>
                   {player.totalScore} pts
                 </span>
               </div>

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Clock, ThumbsDown, Meh, Laugh, Sparkles, Users, SkipForward } from "lucide-react"
 import { MemeMedia } from "@/components/game/meme-media"
+import { DownloadMemeButton } from "@/components/game/download-meme-button"
 import type { Meme } from "@/types/game"
 
 interface VotingViewProps {
@@ -85,11 +86,10 @@ export function VotingView({
               <span>{votedCount}/{eligibleVoters}</span>
             </div>
             <div
-              className={`flex items-center gap-2 px-4 py-2 rounded-full border-2 transition-all duration-300 ${
-                isUrgent
+              className={`flex items-center gap-2 px-4 py-2 rounded-full border-2 transition-all duration-300 ${isUrgent
                   ? "bg-destructive/20 border-destructive text-destructive animate-pulse"
                   : "bg-muted/50 border-border"
-              }`}
+                }`}
             >
               <Clock className={`h-5 w-5 ${isUrgent ? "animate-bounce" : ""}`} />
               <span className="text-2xl font-black font-mono">{timeLeft}s</span>
@@ -111,7 +111,10 @@ export function VotingView({
         <CardContent className="p-6">
           <div className="flex flex-col items-center">
             {/* Meme image */}
-            <div className="relative w-full max-w-md aspect-square flex items-center justify-center bg-muted/30 rounded-xl overflow-hidden mb-4">
+            <div className="relative w-full max-w-md aspect-square flex items-center justify-center bg-muted/30 rounded-xl overflow-hidden mb-4 group">
+              <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 sm:opacity-100 transition-opacity">
+                <DownloadMemeButton meme={meme} />
+              </div>
               <MemeMedia
                 src={meme.imageUrl}
                 alt="Meme"
