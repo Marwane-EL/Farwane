@@ -66,27 +66,56 @@ export function DownloadMemeButton({ meme, className }: DownloadMemeButtonProps)
       imgContainer.style.alignItems = "center"
       imgContainer.style.marginBottom = "24px"
 
-      // Determine if it's a video (gif/mp4) or image
-      // Note: html-to-image doesn't capture videos well, so we use an img tag and hope for a thumbnail or fallback.
-      // If it's tenor, we might have to replace the URL to a static version if possible, but Tenor GIFs usually render the first frame on canvas.
+      const isVideo = /\.(mp4|webm|mov)(\?|$)/i.test(meme.imageUrl)
+      const proxiedUrl = `/api/proxy?url=${encodeURIComponent(meme.imageUrl)}`
+      
       const img = document.createElement("img")
-      img.crossOrigin = "anonymous" // Important for CORS
-      img.src = meme.imageUrl
+      img.crossOrigin = "anonymous"
       img.style.maxWidth = "100%"
       img.style.maxHeight = "500px"
       img.style.objectFit = "contain"
-      
-      // Wait for image to load before capturing
-      await new Promise((resolve, reject) => {
-        img.onload = resolve
-        img.onerror = () => {
-          // If CORS fails, try without crossOrigin
-          img.removeAttribute("crossOrigin")
-          img.src = meme.imageUrl + "?" + new Date().getTime() // Cache bust
+
+      if (isVideo) {
+        // For videos, we extract the first frame using a canvas
+        const video = document.createElement("video")
+        video.crossOrigin = "anonymous"
+        video.src = proxiedUrl
+        video.muted = true
+        video.playsInline = true
+        video.currentTime = 0.5 // Try to grab a frame 0.5s in instead of black screen
+
+        await new Promise((resolve, reject) => {
+          video.onloadeddata = () => {
+            try {
+              const canvas = document.createElement("canvas")
+              canvas.width = video.videoWidth
+              canvas.height = video.videoHeight
+              const ctx = canvas.getContext("2d")
+              ctx?.drawImage(video, 0, 0, canvas.width, canvas.height)
+              img.src = canvas.toDataURL("image/png")
+              resolve(null)
+            } catch (err) {
+              reject(err)
+            }
+          }
+          video.onerror = reject
+          // Load the video data
+          video.load()
+        })
+      } else {
+        // For static images or GIFs, use the proxy
+        img.src = proxiedUrl
+        await new Promise((resolve, reject) => {
           img.onload = resolve
-          img.onerror = reject
-        }
-      })
+          img.onerror = () => {
+            // Fallback to direct URL if proxy fails
+            img.removeAttribute("crossOrigin")
+            img.src = meme.imageUrl
+            img.onload = resolve
+            img.onerror = reject
+          }
+        })
+      }
 
       imgContainer.appendChild(img)
       container.appendChild(imgContainer)
@@ -106,11 +135,16 @@ export function DownloadMemeButton({ meme, className }: DownloadMemeButtonProps)
       // Add to DOM temporarily
       document.body.appendChild(container)
 
+      // CRITICAL: Wait for browser layout & rendering pipelines to register the new DOM node!
+      // Otherwise, the rendered image will be blank (0x0px layout)
+      await new Promise((resolve) => setTimeout(resolve, 300))
+
       // Generate Image
       const dataUrl = await htmlToImage.toPng(container, {
         quality: 1,
         pixelRatio: 2,
         skipFonts: false,
+        backgroundColor: "#09090b", // Force background color in rendering
       })
 
       // Remove from DOM

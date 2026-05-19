@@ -40,10 +40,10 @@ export function ResultsView({
   const podiumOrder = [1, 0, 2]
 
   return (
-    <div className="min-h-screen flex flex-col items-center px-4 py-8">
+    <div className="h-full w-full overflow-y-auto flex flex-col items-center px-2 py-4 sm:px-4 sm:py-8 pb-12">
       {/* Title */}
-      <div className="text-center mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
-        <p className="text-sm text-muted-foreground mb-2">Manche {currentRound}/{totalRounds}</p>
+      <div className="text-center mb-4 sm:mb-8 animate-in fade-in slide-in-from-top-4 duration-500 shrink-0">
+        <p className="text-sm text-muted-foreground mb-1 sm:mb-2">Manche {currentRound}/{totalRounds}</p>
         <div className="flex items-center justify-center gap-3 mb-2">
           <Sparkles className="h-8 w-8 text-secondary animate-pulse" />
           <h1 className="text-4xl md:text-5xl font-black bg-gradient-to-r from-secondary via-primary to-accent bg-clip-text text-transparent">
@@ -54,7 +54,7 @@ export function ResultsView({
       </div>
 
       {/* Podium */}
-      <div className="flex items-end justify-center gap-2 md:gap-4 mb-8 w-full max-w-4xl animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200">
+      <div className="flex items-end justify-center gap-2 md:gap-4 mb-4 sm:mb-8 w-full max-w-4xl animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200 shrink-0">
         {podiumOrder.map((orderIndex, visualIndex) => {
           const meme = topThree[orderIndex]
           const config = podiumConfig[orderIndex]
@@ -88,8 +88,8 @@ export function ResultsView({
 
       {/* Cumulative Leaderboard */}
       {leaderboard.length > 0 && (
-        <Card className="w-full max-w-lg border-2 border-border/50 bg-card/50 backdrop-blur-sm mb-8 animate-in fade-in zoom-in-95 duration-500 delay-400">
-          <CardContent className="p-4">
+        <Card className="w-full max-w-lg border-2 border-border/50 bg-card/50 backdrop-blur-sm mb-4 sm:mb-8 animate-in fade-in zoom-in-95 duration-500 delay-400 shrink-0">
+          <CardContent className="p-3 sm:p-4">
             <h3 className="text-center font-semibold text-muted-foreground mb-3 flex items-center justify-center gap-2">
               <Star className="h-4 w-4 text-secondary" />
               Classement général
@@ -109,7 +109,7 @@ export function ResultsView({
       )}
 
       {/* Action buttons */}
-      <div className="flex flex-col sm:flex-row gap-4 animate-in fade-in slide-in-from-bottom-6 duration-500 delay-700">
+      <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 animate-in fade-in slide-in-from-bottom-6 duration-500 delay-700 shrink-0 mt-auto">
         {isHost ? (
           <Button onClick={onPlayAgain} size="lg"
             className="h-16 px-10 text-xl font-bold bg-gradient-to-r from-accent to-accent/80 text-accent-foreground shadow-lg shadow-accent/30 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-accent/40"

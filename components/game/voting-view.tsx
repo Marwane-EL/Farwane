@@ -12,13 +12,14 @@ interface VotingViewProps {
   meme: Meme
   currentIndex: number
   totalMemes: number
-  onVote: (memeId: string, score: number) => void
+  onVote: (memeId: string, score: number, isHeart?: boolean) => void
   currentPlayerId: string
   hasVotedOnCurrent: boolean
   votedCount: number
   totalPlayers: number
   isHost: boolean
   onForceAdvance: () => void
+  hasUsedHeart: boolean
 }
 
 export function VotingView({
@@ -32,6 +33,7 @@ export function VotingView({
   totalPlayers,
   isHost,
   onForceAdvance,
+  hasUsedHeart,
 }: VotingViewProps) {
   const [timeLeft, setTimeLeft] = useState(20)
   const [selectedVote, setSelectedVote] = useState<string | null>(null)
@@ -53,30 +55,39 @@ export function VotingView({
     return () => clearInterval(timer)
   }, [currentIndex, isOwnMeme])
 
-  const handleVote = (vote: string) => {
+  const handleVote = (vote: string, isHeart: boolean = false) => {
     if (hasVotedOnCurrent || isOwnMeme) return
-    const scoreMap: Record<string, number> = { nul: 0, pasMal: 1, mdr: 3 }
+    const scoreMap: Record<string, number> = {
+      bide: 0,
+      bof: 1,
+      drole: 3,
+      masterclass: 4,
+      banger: 5,
+      heart: 0 // Heart adds +10 inherently in the hook
+    }
     const score = scoreMap[vote] || 0
     setSelectedVote(vote)
-    onVote(meme.id, score)
+    onVote(meme.id, score, isHeart)
   }
 
   const isUrgent = timeLeft <= 5
 
   const voteOptions = [
-    { id: "nul", label: "Nul 💩", icon: ThumbsDown, color: "destructive" },
-    { id: "pasMal", label: "Pas mal 😏", icon: Meh, color: "secondary" },
-    { id: "mdr", label: "MDR 🤣", icon: Laugh, color: "accent" },
+    { id: "bide", label: "Va t'asseoir 🪑", icon: ThumbsDown, color: "destructive", points: 0 },
+    { id: "bof", label: "Sympa mais bof 🤷", icon: Meh, color: "secondary", points: 1 },
+    { id: "drole", label: "Très drôle, bien pensé 😂", icon: Laugh, color: "primary", points: 3 },
+    { id: "masterclass", label: "MasterClass 🔥", icon: Sparkles, color: "accent", points: 4 },
+    { id: "banger", label: "Banger Absolue 🤯", icon: Sparkles, color: "accent", points: 5 },
   ]
 
   // Own meme screen — waiting for others to vote
   // No early return for own meme anymore — we show the same UI but block voting
 
   return (
-    <div className="min-h-screen flex flex-col items-center px-4 py-6">
+    <div className="h-full flex flex-col items-center px-2 py-2 sm:px-4 sm:py-4">
       {/* Timer and progress */}
-      <div className="w-full max-w-2xl mb-6 animate-in fade-in slide-in-from-top-4 duration-500">
-        <div className="flex items-center justify-between mb-4">
+      <div className="w-full max-w-2xl mb-2 sm:mb-4 animate-in fade-in slide-in-from-top-4 duration-500 shrink-0">
+        <div className="flex items-center justify-between mb-2">
           <p className="text-sm text-muted-foreground">
             Meme {currentIndex + 1}/{totalMemes}
           </p>
@@ -87,8 +98,8 @@ export function VotingView({
             </div>
             <div
               className={`flex items-center gap-2 px-4 py-2 rounded-full border-2 transition-all duration-300 ${isUrgent
-                  ? "bg-destructive/20 border-destructive text-destructive animate-pulse"
-                  : "bg-muted/50 border-border"
+                ? "bg-destructive/20 border-destructive text-destructive animate-pulse"
+                : "bg-muted/50 border-border"
                 }`}
             >
               <Clock className={`h-5 w-5 ${isUrgent ? "animate-bounce" : ""}`} />
@@ -107,11 +118,11 @@ export function VotingView({
       </div>
 
       {/* Meme display */}
-      <Card className="w-full max-w-2xl border-2 border-border/50 bg-card/50 backdrop-blur-sm mb-8 animate-in fade-in zoom-in-95 duration-500 delay-100">
-        <CardContent className="p-6">
-          <div className="flex flex-col items-center">
+      <Card className="w-full max-w-2xl border-2 border-border/50 bg-card/50 backdrop-blur-sm mb-2 sm:mb-4 animate-in fade-in zoom-in-95 duration-500 delay-100 flex-1 min-h-0 flex flex-col">
+        <CardContent className="p-3 sm:p-4 flex-1 min-h-0 flex flex-col items-center justify-center">
+          <div className="flex flex-col items-center w-full h-full max-h-full justify-center gap-2">
             {/* Meme image */}
-            <div className="relative w-full max-w-md aspect-square flex items-center justify-center bg-muted/30 rounded-xl overflow-hidden mb-4 group">
+            <div className="relative w-full max-w-sm flex-1 min-h-0 flex items-center justify-center bg-muted/30 rounded-xl overflow-hidden group">
               <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 sm:opacity-100 transition-opacity">
                 <DownloadMemeButton meme={meme} />
               </div>
@@ -123,14 +134,14 @@ export function VotingView({
             </div>
 
             {/* Caption */}
-            <div className="w-full text-center p-4 rounded-xl bg-gradient-to-r from-primary/10 to-accent/10 border border-border/50">
-              <p className="text-xl md:text-2xl font-bold text-foreground">
+            <div className="w-full text-center p-2 sm:p-3 rounded-xl bg-gradient-to-r from-primary/10 to-accent/10 border border-border/50 shrink-0">
+              <p className="text-lg sm:text-xl md:text-2xl font-bold text-foreground leading-tight">
                 {'"'}{meme.caption}{'"'}
               </p>
             </div>
 
             {/* Anonymous indicator */}
-            <p className="mt-4 text-sm text-muted-foreground">
+            <p className="text-xs text-muted-foreground shrink-0">
               Créé par un joueur anonyme 🎭
             </p>
           </div>
@@ -138,70 +149,106 @@ export function VotingView({
       </Card>
 
       {/* Vote buttons or waiting state */}
-      {isOwnMeme ? (
-        <div className="text-center animate-in fade-in duration-300">
-          <p className="text-xl font-bold text-secondary mb-2">C&apos;est ta légende ! 😏</p>
-          <p className="text-sm text-muted-foreground mb-4">Les autres joueurs sont en train de voter...</p>
-          {isHost && (
-            <Button
-              onClick={onForceAdvance}
-              variant="outline"
-              size="sm"
-              className="mt-4 border-2"
-            >
-              <SkipForward className="mr-2 h-4 w-4" />
-              Forcer le passage
-            </Button>
-          )}
-        </div>
-      ) : hasVotedOnCurrent ? (
-        <div className="text-center animate-in fade-in duration-300">
-          <p className="text-lg text-primary mb-2">Vote enregistré ! ✨</p>
-          <p className="text-sm text-muted-foreground">En attente des autres joueurs...</p>
-          {isHost && (
-            <Button
-              onClick={onForceAdvance}
-              variant="outline"
-              size="sm"
-              className="mt-4 border-2"
-            >
-              <SkipForward className="mr-2 h-4 w-4" />
-              Forcer le passage
-            </Button>
-          )}
-        </div>
-      ) : (
-        <div className="flex flex-wrap justify-center gap-4 animate-in fade-in slide-in-from-bottom-6 duration-500 delay-200">
-          {voteOptions.map((option) => {
-            const Icon = option.icon
-            const isSelected = selectedVote === option.id
-
-            return (
+      <div className="w-full max-w-4xl shrink-0 mt-auto">
+        {isOwnMeme ? (
+          <div className="text-center animate-in fade-in duration-300 pb-2">
+            <p className="text-xl font-bold text-secondary mb-2">C&apos;est ta légende ! 😏</p>
+            <p className="text-sm text-muted-foreground mb-4">Les autres joueurs sont en train de voter...</p>
+            {isHost && (
               <Button
-                key={option.id}
-                onClick={() => handleVote(option.id)}
-                disabled={hasVotedOnCurrent || isOwnMeme}
-                size="lg"
-                variant={isSelected ? "default" : "outline"}
-                className={`
-                  h-16 px-8 text-lg font-bold border-2 transition-all duration-300
-                  ${isSelected ? "scale-110" : "hover:scale-105"}
-                  ${option.color === "destructive" && "hover:bg-destructive/20 hover:border-destructive hover:text-destructive"}
-                  ${option.color === "secondary" && "hover:bg-secondary/20 hover:border-secondary hover:text-secondary"}
-                  ${option.color === "accent" && "hover:bg-accent/20 hover:border-accent hover:text-accent"}
-                  ${isSelected && option.color === "destructive" && "bg-destructive text-destructive-foreground border-destructive"}
-                  ${isSelected && option.color === "secondary" && "bg-secondary text-secondary-foreground border-secondary"}
-                  ${isSelected && option.color === "accent" && "bg-accent text-accent-foreground border-accent"}
-                  disabled:opacity-70
-                `}
+                onClick={onForceAdvance}
+                variant="outline"
+                size="sm"
+                className="mt-4 border-2"
               >
-                <Icon className="mr-2 h-6 w-6" />
-                {option.label}
+                <SkipForward className="mr-2 h-4 w-4" />
+                Forcer le passage
               </Button>
-            )
-          })}
-        </div>
-      )}
+            )}
+          </div>
+        ) : (
+          <>
+            {/* 1. Le message "Vote enregistré" s'affiche uniquement SI le joueur a voté */}
+            {hasVotedOnCurrent && (
+              <div className="text-center animate-in fade-in duration-300 mb-2 sm:mb-4">
+                <p className="text-lg text-primary mb-2">Vote enregistré ! ✨</p>
+                <p className="text-sm text-muted-foreground">En attente des autres joueurs...</p>
+                {isHost && (
+                  <Button
+                    onClick={onForceAdvance}
+                    variant="outline"
+                    size="sm"
+                    className="mt-4 border-2"
+                  >
+                    <SkipForward className="mr-2 h-4 w-4" />
+                    Forcer le passage
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {/* 2. L'interface de vote s'affiche tout le temps (mais sera disabled si hasVotedOnCurrent est true) */}
+            <div className="w-full animate-in fade-in slide-in-from-bottom-6 duration-500 delay-200">
+              <div className="flex flex-wrap justify-center items-center gap-2 mb-2 sm:mb-4">
+                {voteOptions.map((option) => {
+                  const Icon = option.icon;
+                  const isSelected = selectedVote === option.id;
+
+                  return (
+                    <Button
+                      key={option.id}
+                      onClick={() => handleVote(option.id)}
+                      disabled={hasVotedOnCurrent || isOwnMeme}
+                      variant={isSelected ? "default" : "outline"}
+                      className={`
+                        flex-1 min-w-[140px] max-w-[200px] h-auto py-2 px-2 sm:px-4 flex flex-col items-center justify-center gap-1 border-2 transition-all duration-300
+                        ${isSelected ? "scale-105" : "hover:scale-105"}
+                        ${option.color === "destructive" && "hover:bg-destructive/20 hover:border-destructive hover:text-destructive"}
+                        ${option.color === "secondary" && "hover:bg-secondary/20 hover:border-secondary hover:text-secondary"}
+                        ${option.color === "primary" && "hover:bg-primary/20 hover:border-primary hover:text-primary"}
+                        ${option.color === "accent" && "hover:bg-accent/20 hover:border-accent hover:text-accent"}
+                        ${isSelected && option.color === "destructive" && "bg-destructive text-destructive-foreground border-destructive"}
+                        ${isSelected && option.color === "secondary" && "bg-secondary text-secondary-foreground border-secondary"}
+                        ${isSelected && option.color === "primary" && "bg-primary text-primary-foreground border-primary"}
+                        ${isSelected && option.color === "accent" && "bg-accent text-accent-foreground border-accent"}
+                        disabled:opacity-70
+                      `}
+                    >
+                      <span className="text-xs sm:text-sm font-bold text-center leading-tight">{option.label}</span>
+                      <span className="text-[10px] sm:text-xs opacity-80">{option.points} pt{option.points > 1 ? "s" : ""}</span>
+                    </Button>
+                  )
+                })}
+              </div>
+
+              <div className="flex justify-center border-t border-border/50 pt-3 sm:pt-4 mt-1 relative">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-background px-2 text-[10px] sm:text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                  Ou alors...
+                </div>
+                <Button
+                  onClick={() => handleVote("heart", true)}
+                  disabled={hasVotedOnCurrent || isOwnMeme || hasUsedHeart}
+                  variant={selectedVote === "heart" ? "default" : "outline"}
+                  className={`
+                    h-12 sm:h-14 px-4 sm:px-8 text-sm sm:text-lg font-black border-2 transition-all duration-300 rounded-full
+                    ${hasUsedHeart && selectedVote !== "heart" ? "opacity-50 grayscale" : "shadow-[0_0_15px_rgba(239,68,68,0.5)]"}
+                    ${selectedVote === "heart"
+                      ? "bg-red-500 text-white border-red-500 scale-105 shadow-[0_0_30px_rgba(239,68,68,0.8)]"
+                      : "hover:bg-red-500/20 hover:text-red-500 hover:border-red-500 hover:scale-105 border-red-500/50"}
+                  `}
+                >
+                  <span className="text-2xl mr-2">❤️</span>
+                  COUP DE CŒUR (+10 pts)
+                  {hasUsedHeart && selectedVote !== "heart" && (
+                    <span className="ml-2 text-xs font-normal opacity-75">(Déjà utilisé)</span>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   )
 }
+

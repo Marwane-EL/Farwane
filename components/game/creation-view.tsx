@@ -193,7 +193,7 @@ export function CreationView({
                 onClick={onRefreshMeme}
                 disabled={refreshesLeft <= 0 || hasSubmitted}
                 title="Changer d'image"
-                className="gap-1.5 h-7 px-2 text-xs"
+                className="gap-1.5 h-7 px-2 text-xs hover:bg-white/10 hover:text-white border-border/50 transition-colors"
               >
                 <RefreshCw className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Changer</span>

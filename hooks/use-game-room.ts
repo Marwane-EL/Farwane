@@ -150,6 +150,7 @@ export function useGameRoom() {
   const [currentMemeIndex, setCurrentMemeIndex] = useState(0)
   const [hasSubmitted, setHasSubmitted] = useState(false)
   const [refreshesLeft, setRefreshesLeft] = useState(5)
+  const [hasUsedHeart, setHasUsedHeart] = useState(false)
 
   // Synced voting state
   const [hasVotedOnCurrent, setHasVotedOnCurrent] = useState(false)
@@ -282,6 +283,7 @@ export function useGameRoom() {
       setHasSubmitted(false)
       setCurrentMemeIndex(0)
       setMyMemeUrl("")
+      setHasUsedHeart(false)
     })
 
     channel.subscribe(async (status) => {
@@ -384,6 +386,7 @@ export function useGameRoom() {
     setSubmissions([])
     setHasSubmitted(false)
     setRefreshesLeft(5)
+    setHasUsedHeart(false)
     channelRef.current.send({
       type: "broadcast", event: "game:start",
       payload: { pack: selectedPack, assignments, settings },
@@ -412,16 +415,22 @@ export function useGameRoom() {
     channelRef.current.send({ type: "broadcast", event: "game:voting", payload: { submissions } })
   }, [currentPlayer, submissions])
 
-  const vote = useCallback((memeId: string, score: number) => {
+  const vote = useCallback((memeId: string, score: number, isHeart: boolean = false) => {
     if (!channelRef.current || !currentPlayer || hasVotedOnCurrent) return
+    if (isHeart && hasUsedHeart) return // Security check
+
+    const finalScore = isHeart ? score + 10 : score
+    
     setHasVotedOnCurrent(true)
+    if (isHeart) setHasUsedHeart(true)
+    
     setCurrentVoters((prev) => [...prev, currentPlayer.id])
-    setSubmissions((prev) => prev.map((m) => (m.id === memeId ? { ...m, votes: m.votes + score } : m)))
+    setSubmissions((prev) => prev.map((m) => (m.id === memeId ? { ...m, votes: m.votes + finalScore } : m)))
     channelRef.current.send({
       type: "broadcast", event: "game:vote",
-      payload: { memeId, score, voterId: currentPlayer.id },
+      payload: { memeId, score: finalScore, voterId: currentPlayer.id },
     })
-  }, [currentPlayer, hasVotedOnCurrent])
+  }, [currentPlayer, hasVotedOnCurrent, hasUsedHeart])
 
   // Host: advance to next meme (used by auto-advance and force-advance)
   const advanceMeme = useCallback(() => {
@@ -521,6 +530,7 @@ export function useGameRoom() {
     setHasSubmitted(false)
     setCurrentMemeIndex(0)
     setMyMemeUrl("")
+    setHasUsedHeart(false)
     usedMemeUrlsRef.current.clear()
     await supabase.from("rooms").update({ status: "waiting" }).eq("code", roomCode)
     channelRef.current.send({ type: "broadcast", event: "game:new-game", payload: {} })
@@ -544,6 +554,7 @@ export function useGameRoom() {
     setCurrentMemeIndex(0)
     setMyMemeUrl("")
     setHasSubmitted(false)
+    setHasUsedHeart(false)
     setError(null)
     setCurrentRound(1)
     setPlayerScores({})
@@ -597,7 +608,7 @@ export function useGameRoom() {
     memePacks, packsLoading,
     selectedPack, myMemeUrl,
     submissions, currentMemeIndex, hasSubmitted,
-    hasVotedOnCurrent, currentVoters,
+    hasVotedOnCurrent, currentVoters, hasUsedHeart,
     error, isLoading, libraries,
     createRoom, joinRoom, leaveRoom,
     updateSettings, selectPack, startGame,

@@ -15,7 +15,7 @@ export default function MemeGame() {
     memePacks, packsLoading,
     selectedPack, myMemeUrl,
     submissions, currentMemeIndex, hasSubmitted,
-    hasVotedOnCurrent, currentVoters,
+    hasVotedOnCurrent, currentVoters, hasUsedHeart,
     error, isLoading, libraries,
     createRoom, joinRoom, leaveRoom,
     updateSettings, selectPack, startGame,
@@ -93,6 +93,7 @@ export default function MemeGame() {
             totalPlayers={players.length}
             isHost={currentPlayer?.isHost || false}
             onForceAdvance={advanceMeme}
+            hasUsedHeart={hasUsedHeart}
           />
         )}
         {phase === "results" && (
