@@ -7,6 +7,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Clock, Send, CheckCircle, Users, Loader2, RefreshCw } from "lucide-react"
 import { MemeMedia } from "@/components/game/meme-media"
 import { PokemonMemory } from "@/components/game/pokemon-memory"
+import { TetrisGame } from "@/components/game/tetris/TetrisGame"
+import { Gamepad2 } from "lucide-react"
 
 interface CreationViewProps {
   currentMemeUrl: string
@@ -39,6 +41,7 @@ export function CreationView({
 }: CreationViewProps) {
   const [timeLeft, setTimeLeft] = useState(timerDuration)
   const [caption, setCaption] = useState("")
+  const [activeMiniGame, setActiveMiniGame] = useState<"pokemon" | "tetris">("pokemon")
   const captionRef = useRef("")
 
   // Keep ref in sync with state
@@ -103,9 +106,29 @@ export function CreationView({
             <Loader2 className="h-4 w-4 animate-spin" />
             <span>En attente des autres joueurs...</span>
           </div>
+
+          <div className="flex gap-2 mb-2 shrink-0">
+            <Button
+              variant={activeMiniGame === "pokemon" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setActiveMiniGame("pokemon")}
+              className="h-8 rounded-full text-xs"
+            >
+              Pokémon
+            </Button>
+            <Button
+              variant={activeMiniGame === "tetris" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setActiveMiniGame("tetris")}
+              className="h-8 rounded-full text-xs"
+            >
+              <Gamepad2 className="w-3 h-3 mr-1" />
+              Tetris
+            </Button>
+          </div>
           
-          <div className="flex-1 min-h-0 w-full flex justify-center pb-2">
-            <PokemonMemory />
+          <div className="flex-1 min-h-0 w-full flex justify-center pb-2 relative z-0">
+            {activeMiniGame === "pokemon" ? <PokemonMemory /> : <TetrisGame />}
           </div>
 
           {/* Host can force move to voting if someone is slow/AFK */}

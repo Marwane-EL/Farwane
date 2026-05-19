@@ -168,3 +168,63 @@
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
+
+/* Tetris Game Specific Styles */
+.tetris-game .row {
+  display: flex;
+}
+.tetris-game .cell {
+  aspect-ratio: 1;
+}
+.tetris-game .cell.hidden {
+  visibility: hidden;
+}
+.tetris-game .cell.Empty {
+  background-color: transparent;
+}
+.tetris-game .cell.I {
+  background-color: rgb(80, 227, 230);
+  box-shadow: 0 0 5px rgb(80, 227, 230), 0 0 15px rgb(80, 227, 230);
+  border: 1px solid black;
+}
+.tetris-game .cell.J {
+  background-color: rgb(36, 95, 223);
+  box-shadow: 0 0 5px rgb(36, 95, 223), 0 0 15px rgb(36, 95, 223);
+  border: 1px solid black;
+}
+.tetris-game .cell.L {
+  background-color: rgb(223, 173, 36);
+  box-shadow: 0 0 5px rgb(223, 173, 36), 0 0 15px rgb(223, 173, 36);
+  border: 1px solid black;
+}
+.tetris-game .cell.O {
+  background-color: rgb(223, 217, 36);
+  box-shadow: 0 0 5px rgb(223, 217, 36), 0 0 15px rgb(223, 217, 36);
+  border: 1px solid black;
+}
+.tetris-game .cell.S {
+  background-color: rgb(48, 211, 56);
+  box-shadow: 0 0 5px rgb(48, 211, 56), 0 0 15px rgb(48, 211, 56);
+  border: 1px solid black;
+}
+.tetris-game .cell.T {
+  background-color: rgb(132, 61, 198);
+  box-shadow: 0 0 5px rgb(132, 61, 198), 0 0 15px rgb(132, 61, 198);
+  border: 1px solid black;
+}
+.tetris-game .cell.Z {
+  background-color: rgb(227, 78, 78);
+  box-shadow: 0 0 5px rgb(227, 78, 78), 0 0 15px rgb(227, 78, 78);
+  border: 1px solid black;
+}
+.tetris-game .cell.Ghost,
+.tetris-game .cell.IGhost,
+.tetris-game .cell.JGhost,
+.tetris-game .cell.LGhost,
+.tetris-game .cell.OGhost,
+.tetris-game .cell.SGhost,
+.tetris-game .cell.TGhost,
+.tetris-game .cell.ZGhost {
+  background-color: rgba(128, 128, 128, 0.5);
+  border: 1px solid black;
+}
