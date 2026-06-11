@@ -30,8 +30,8 @@ interface structuredClone {
   (obj: any): any;
 }
 
-export function useTetris(gameOverCallback: () => void) {
-  const [score, setScore] = useState(0);
+export function useTetris(gameOverCallback: () => void, initialScore = 0) {
+  const [score, setScore] = useState(initialScore);
   const [upcomingBlocks, setUpcomingBlocks] = useState<Block[]>([]);
   const [isCommitting, setIsCommitting] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -65,11 +65,13 @@ export function useTetris(gameOverCallback: () => void) {
       getRandomBlock(),
       getRandomBlock(),
     ];
-    setScore(0);
+    // Resume from the saved cross-round score so difficulty scales continuously
+    const resumeScore = loadScoreFromLocalStorage();
+    setScore(resumeScore);
     setUpcomingBlocks(startingBlocks);
     setIsCommitting(false);
     setIsPlaying(true);
-    setTickSpeed(getNormalTickSpeed(0));
+    setTickSpeed(getNormalTickSpeed(resumeScore));
     dispatchBoardState({ type: "start" });
   }, [dispatchBoardState]);
 
@@ -110,7 +112,6 @@ export function useTetris(gameOverCallback: () => void) {
       setTickSpeed(getNormalTickSpeed(score + getPoints(numCleared)));
     }
     setUpcomingBlocks(newUpcomingBlocks);
-    setScore((prevScore) => prevScore + getPoints(numCleared));
     dispatchBoardState({
       type: "commit",
       newBoard: [...getEmptyBoard(BOARD_HEIGHT - newBoard.length), ...newBoard],
@@ -121,10 +122,8 @@ export function useTetris(gameOverCallback: () => void) {
     const newScore = score + getPoints(numCleared);
     setScore(newScore);
 
-    // saveScoreToLocalStorage(newScore) only if newScore is greater than the current score from localStorage
-    if (newScore > loadScoreFromLocalStorage()) {
-      saveScoreToLocalStorage(newScore);
-    }
+    // Always persist the latest score so it survives round changes
+    saveScoreToLocalStorage(newScore);
   }, [
     board,
     dispatchBoardState,

@@ -90,64 +90,66 @@ export function CreationView({
   // Waiting screen after submission
   if (hasSubmitted) {
     return (
-      <div className="h-full w-full flex flex-col items-center py-4 px-4 overflow-hidden">
-        <div className="text-center animate-in fade-in zoom-in-95 duration-500 w-full max-w-4xl mx-auto flex flex-col items-center min-h-0">
-          <CheckCircle className="h-10 w-10 sm:h-12 sm:w-12 text-accent mx-auto mb-2 animate-bounce shrink-0" />
-          <h2 className="text-xl sm:text-2xl font-black mb-2 bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent shrink-0">
-            Meme envoyé !
-          </h2>
-          <div className="flex items-center justify-center gap-2 px-4 py-1.5 rounded-full bg-muted/50 border-2 border-border mb-3 shrink-0">
-            <Users className="h-4 w-4 text-primary" />
-            <span className="text-sm sm:text-base font-medium text-muted-foreground">
-              {submissionCount}/{totalPlayers} joueurs ont soumis
-            </span>
-          </div>
-          <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground mb-2 shrink-0">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span>En attente des autres joueurs...</span>
-          </div>
+      <div className="h-full w-full overflow-y-auto">
+        <div className="flex flex-col items-center py-3 px-4 min-h-full">
+          <div className="text-center animate-in fade-in zoom-in-95 duration-500 w-full max-w-4xl mx-auto flex flex-col items-center">
+            <CheckCircle className="h-9 w-9 sm:h-12 sm:w-12 text-accent mx-auto mb-2 animate-bounce shrink-0" />
+            <h2 className="text-lg sm:text-2xl font-black mb-1.5 bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent shrink-0">
+              Meme envoyé !
+            </h2>
+            <div className="flex items-center justify-center gap-2 px-4 py-1.5 rounded-full bg-muted/50 border-2 border-border mb-2 shrink-0">
+              <Users className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium text-muted-foreground">
+                {submissionCount}/{totalPlayers} joueurs ont soumis
+              </span>
+            </div>
+            <div className="flex items-center justify-center gap-2 text-xs sm:text-sm text-muted-foreground mb-2 shrink-0">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>En attente des autres joueurs...</span>
+            </div>
 
-          <div className="flex gap-2 mb-2 shrink-0">
-            <Button
-              variant={activeMiniGame === "pokemon" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setActiveMiniGame("pokemon")}
-              className="h-8 rounded-full text-xs"
-            >
-              Pokémon
-            </Button>
-            <Button
-              variant={activeMiniGame === "tetris" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setActiveMiniGame("tetris")}
-              className="h-8 rounded-full text-xs"
-            >
-              <Gamepad2 className="w-3 h-3 mr-1" />
-              Tetris
-            </Button>
-          </div>
-          
-          <div className="flex-1 min-h-0 w-full flex justify-center pb-2 relative z-0">
-            {activeMiniGame === "pokemon" ? <PokemonMemory /> : <TetrisGame />}
-          </div>
+            <div className="flex gap-2 mb-2 shrink-0">
+              <Button
+                variant={activeMiniGame === "pokemon" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setActiveMiniGame("pokemon")}
+                className="h-8 rounded-full text-xs"
+              >
+                Pokémon
+              </Button>
+              <Button
+                variant={activeMiniGame === "tetris" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setActiveMiniGame("tetris")}
+                className="h-8 rounded-full text-xs"
+              >
+                <Gamepad2 className="w-3 h-3 mr-1" />
+                Tetris
+              </Button>
+            </div>
 
-          {/* Host can force move to voting if someone is slow/AFK */}
-          {isHost && submissionCount >= 1 && submissionCount < totalPlayers && (
-            <Button
-              onClick={onForceVoting}
-              size="sm"
-              variant="outline"
-              className="mt-2 h-10 px-6 text-sm font-bold transition-all duration-300 hover:scale-105 bg-background border-2 shrink-0"
-            >
-              Forcer le passage aux votes ({submissionCount})
-            </Button>
-          )}
+            {/* Minigame — fixed height so it doesn't collapse */}
+            <div className="w-full flex justify-center pb-2 relative z-0" style={{ height: '420px', maxHeight: '55vh' }}>
+              {activeMiniGame === "pokemon" ? <PokemonMemory /> : <TetrisGame roundNumber={currentRound} />}
+            </div>
 
-          {submissionCount >= totalPlayers && (
-             <div className="mt-2 px-6 py-2 bg-primary/20 text-primary border border-primary/30 rounded-full font-bold animate-pulse text-sm sm:text-base shrink-0">
-                Lancement des votes imminent...
-             </div>
-          )}
+            {isHost && submissionCount >= 1 && submissionCount < totalPlayers && (
+              <Button
+                onClick={onForceVoting}
+                size="sm"
+                variant="outline"
+                className="mt-2 h-10 px-6 text-sm font-bold transition-all duration-300 hover:scale-105 bg-background border-2 shrink-0"
+              >
+                Forcer le passage aux votes ({submissionCount})
+              </Button>
+            )}
+
+            {submissionCount >= totalPlayers && (
+               <div className="mt-2 px-6 py-2 bg-primary/20 text-primary border border-primary/30 rounded-full font-bold animate-pulse text-sm sm:text-base shrink-0">
+                  Lancement des votes imminent...
+               </div>
+            )}
+          </div>
         </div>
       </div>
     )

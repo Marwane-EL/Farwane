@@ -126,9 +126,22 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    -webkit-tap-highlight-color: transparent;
+  }
+  html {
+    /* Prevent text size adjustment on orientation change */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
   body {
     @apply bg-background text-foreground;
+    /* Smooth momentum scrolling on iOS */
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: none;
+  }
+  /* Scrollable containers get momentum scrolling */
+  .overflow-y-auto, .overflow-y-scroll {
+    -webkit-overflow-scrolling: touch;
   }
 }
 

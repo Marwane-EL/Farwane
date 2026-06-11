@@ -15,6 +15,16 @@ export const metadata: Metadata = {
   },
 }
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  // Keeps layout stable when mobile keyboard opens
+  interactiveWidget: 'resizes-content',
+  themeColor: '#1e1e2e',
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{

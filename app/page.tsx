@@ -7,6 +7,7 @@ import { VotingView } from "@/components/game/voting-view"
 import { ResultsView } from "@/components/game/results-view"
 import { FinalResultsView } from "@/components/game/final-results-view"
 import { useGameRoom } from "@/hooks/use-game-room"
+import { resetTetrisScore } from "@/components/game/tetris/TetrisGame"
 
 export default function MemeGame() {
   const {
@@ -61,8 +62,8 @@ export default function MemeGame() {
             settings={settings}
             onSelectPack={selectPack}
             onUpdateSettings={updateSettings}
-            onStartGame={startGame}
-            onLeave={leaveRoom}
+            onStartGame={() => { resetTetrisScore(); startGame(); }}
+            onLeave={() => { resetTetrisScore(); leaveRoom(); }}
           />
         )}
         {phase === "creation" && (
@@ -112,8 +113,8 @@ export default function MemeGame() {
           <FinalResultsView
             players={players}
             playerScores={playerScores}
-            onNewGame={newGame}
-            onBackToHome={leaveRoom}
+            onNewGame={() => { resetTetrisScore(); newGame(); }}
+            onBackToHome={() => { resetTetrisScore(); leaveRoom(); }}
             isHost={currentPlayer?.isHost || false}
           />
         )}

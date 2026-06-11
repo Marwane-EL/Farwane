@@ -19,18 +19,19 @@ export function MemeMedia({ src, alt, className }: MemeMediaProps) {
 
   useEffect(() => {
     if (isVideo && videoRef.current) {
-      // Attempt to play automatically
       const playPromise = videoRef.current.play()
       if (playPromise !== undefined) {
         playPromise.catch(() => {
-          // The browser blocked unmuted autoplay
-          setPlayBlocked(true)
-          // We can optionally fallback to muted autoplay:
-          // if (videoRef.current) {
-          //   videoRef.current.muted = true
-          //   setIsMuted(true)
-          //   videoRef.current.play()
-          // }
+          // Browser blocked unmuted autoplay (common on mobile)
+          // Fallback: muted autoplay — user can unmute via the button
+          if (videoRef.current) {
+            videoRef.current.muted = true
+            setIsMuted(true)
+            videoRef.current.play().catch(() => {
+              // Still blocked — show manual play button
+              setPlayBlocked(true)
+            })
+          }
         })
       }
     }
