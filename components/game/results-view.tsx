@@ -70,7 +70,7 @@ export function ResultsView({
                       <DownloadMemeButton meme={meme} className="h-7 w-7" />
                     </div>
                     <div className="w-full aspect-square rounded-lg overflow-hidden mb-1.5 bg-muted/50">
-                      <MemeMedia src={meme.imageUrl} alt={`Meme de ${meme.playerPseudo}`} className="w-full h-full object-cover" />
+                      <MemeMedia src={meme.imageUrl} alt={`Meme de ${meme.playerPseudo}`} className="w-full h-full object-cover" forceMuted />
                     </div>
                     <p className="font-bold text-xs sm:text-sm truncate">{meme.playerPseudo}</p>
                     <p className={`text-base sm:text-xl font-black ${config.textColor}`}>{meme.votes} pts</p>
