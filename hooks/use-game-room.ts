@@ -165,7 +165,7 @@ export function useGameRoom() {
   const [submissions, setSubmissions] = useState<Meme[]>([])
   const [currentMemeIndex, setCurrentMemeIndex] = useState(0)
   const [hasSubmitted, setHasSubmitted] = useState(false)
-  const [refreshesLeft, setRefreshesLeft] = useState(5)
+  const [refreshesLeft, setRefreshesLeft] = useState(10)
   const [hasUsedHeart, setHasUsedHeart] = useState(false)
 
   // Synced voting state
@@ -229,7 +229,7 @@ export function useGameRoom() {
       setPlayerScores({})
       setSubmissions([])
       setHasSubmitted(false)
-      setRefreshesLeft(5)
+      setRefreshesLeft(10)
     })
 
     // Meme submitted
@@ -279,7 +279,7 @@ export function useGameRoom() {
       setCurrentRound(payload.round)
       setSubmissions([])
       setHasSubmitted(false)
-      setRefreshesLeft(5)
+      setRefreshesLeft(10)
       setCurrentMemeIndex(0)
     })
 
@@ -401,7 +401,7 @@ export function useGameRoom() {
     setPlayerScores({})
     setSubmissions([])
     setHasSubmitted(false)
-    setRefreshesLeft(5)
+    setRefreshesLeft(10)
     setHasUsedHeart(false)
     channelRef.current.send({
       type: "broadcast", event: "game:start",
@@ -527,7 +527,7 @@ export function useGameRoom() {
       setCurrentRound(nextRoundNum)
       setSubmissions([])
       setHasSubmitted(false)
-      setRefreshesLeft(5)
+      setRefreshesLeft(10)
       setCurrentMemeIndex(0)
       channelRef.current.send({
         type: "broadcast", event: "game:next-round",
