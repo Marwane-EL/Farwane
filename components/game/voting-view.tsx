@@ -84,42 +84,44 @@ export function VotingView({
     <div className="h-full flex flex-col items-center px-2 py-2 sm:px-4 sm:py-3 overflow-hidden">
       {/* Timer and progress */}
       <div className="w-full max-w-2xl mb-2 animate-in fade-in slide-in-from-top-4 duration-500 shrink-0">
-        <div className="flex items-center justify-between mb-1.5">
-          <p className="text-xs sm:text-sm text-muted-foreground">
-            Meme {currentIndex + 1}/{totalMemes}
-          </p>
-          <div className="flex items-center gap-2 sm:gap-4">
-            <div className="flex items-center gap-1 text-xs sm:text-sm text-muted-foreground">
-              <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">
+              Meme {currentIndex + 1}/{totalMemes}
+            </span>
+            <div className="flex items-center gap-1 px-2 py-1 rounded border-2 border-border bg-muted/30 text-xs font-bold text-muted-foreground">
+              <Users className="h-3 w-3" />
               <span>{votedCount}/{eligibleVoters}</span>
             </div>
-            <div
-              className={`flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full border-2 transition-all duration-300 ${isUrgent
-                ? "bg-destructive/20 border-destructive text-destructive animate-pulse"
-                : "bg-muted/50 border-border"
-                }`}
-            >
-              <Clock className={`h-4 w-4 sm:h-5 sm:w-5 ${isUrgent ? "animate-bounce" : ""}`} />
-              <span className="text-lg sm:text-2xl font-black font-mono">{timeLeft}s</span>
-            </div>
+          </div>
+          {/* Neo-brut timer badge */}
+          <div
+            className={`flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg border-2 font-black font-mono transition-all duration-300 ${
+              isUrgent
+                ? "bg-destructive/20 border-destructive text-destructive shadow-[3px_3px_0px_oklch(0.45_0.25_25_/_0.6)] animate-pulse"
+                : "bg-muted/40 border-border shadow-[2px_2px_0px_var(--border)]"
+            }`}
+          >
+            <Clock className={`h-4 w-4 sm:h-5 sm:w-5 ${isUrgent ? "animate-bounce" : ""}`} />
+            <span className="text-lg sm:text-2xl">{timeLeft}s</span>
           </div>
         </div>
 
-        {/* Progress bar */}
-        <div className="h-1.5 sm:h-2 bg-muted rounded-full overflow-hidden">
+        {/* Progress bar — neo-brut style */}
+        <div className="h-2 sm:h-2.5 bg-muted rounded border-2 border-border overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-primary to-accent transition-all duration-300"
+            className="h-full bg-primary transition-all duration-300"
             style={{ width: `${((currentIndex + 1) / totalMemes) * 100}%` }}
           />
         </div>
       </div>
 
       {/* Meme display */}
-      <Card className="w-full max-w-2xl border-2 border-border/50 bg-card/50 backdrop-blur-sm mb-2 animate-in fade-in zoom-in-95 duration-500 delay-100 flex-1 min-h-0 flex flex-col">
+      <Card className="w-full max-w-2xl border-2 border-border mb-2 animate-in fade-in zoom-in-95 duration-500 delay-100 flex-1 min-h-0 flex flex-col shadow-[4px_4px_0px_oklch(0.75_0.25_300_/_0.4)]">
         <CardContent className="p-2 sm:p-4 flex-1 min-h-0 flex flex-col items-center justify-center">
           <div className="flex flex-col items-center w-full h-full max-h-full justify-center gap-1.5 sm:gap-2">
             {/* Meme image */}
-            <div className="relative w-full flex-1 min-h-0 flex items-center justify-center bg-muted/30 rounded-xl overflow-hidden group">
+            <div className="relative w-full flex-1 min-h-0 flex items-center justify-center bg-muted/20 rounded-lg overflow-hidden border-2 border-border/50 group">
               <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 sm:opacity-100 transition-opacity">
                 <DownloadMemeButton meme={meme} />
               </div>
@@ -130,15 +132,15 @@ export function VotingView({
               />
             </div>
 
-            {/* Caption */}
-            <div className="w-full text-center p-2 rounded-xl bg-gradient-to-r from-primary/10 to-accent/10 border border-border/50 shrink-0 overflow-y-auto max-h-32 sm:max-h-40">
-              <p className="text-base sm:text-xl md:text-2xl font-bold text-foreground leading-tight break-words whitespace-pre-wrap">
-                {'"'}{meme.caption}{'"'}
+            {/* Caption — neo-brut */}
+            <div className="w-full text-center p-2.5 rounded-lg border-2 border-primary/40 bg-primary/5 shadow-[3px_3px_0px_oklch(0.75_0.25_300_/_0.3)] shrink-0 overflow-y-auto max-h-32 sm:max-h-40">
+              <p className="text-base sm:text-xl md:text-2xl font-black text-foreground leading-tight break-words whitespace-pre-wrap">
+                &quot;{meme.caption}&quot;
               </p>
             </div>
 
             {/* Anonymous indicator */}
-            <p className="text-xs text-muted-foreground shrink-0">
+            <p className="text-xs text-muted-foreground shrink-0 font-medium">
               Créé par un joueur anonyme 🎭
             </p>
           </div>
@@ -149,15 +151,10 @@ export function VotingView({
       <div className="w-full max-w-4xl shrink-0">
         {isOwnMeme ? (
           <div className="text-center animate-in fade-in duration-300 py-1">
-            <p className="text-base sm:text-xl font-bold text-secondary mb-1">C&apos;est ta légende ! 😏</p>
-            <p className="text-xs sm:text-sm text-muted-foreground mb-2">Les autres joueurs sont en train de voter...</p>
+            <p className="text-base sm:text-xl font-black text-secondary mb-1">C&apos;est ta légende ! 😏</p>
+            <p className="text-xs sm:text-sm text-muted-foreground mb-2 font-medium">Les autres joueurs sont en train de voter...</p>
             {isHost && (
-              <Button
-                onClick={onForceAdvance}
-                variant="outline"
-                size="sm"
-                className="mt-2 border-2"
-              >
+              <Button onClick={onForceAdvance} variant="outline" size="sm" className="mt-2">
                 <SkipForward className="mr-2 h-4 w-4" />
                 Forcer le passage
               </Button>
@@ -167,15 +164,10 @@ export function VotingView({
           <>
             {hasVotedOnCurrent && (
               <div className="text-center animate-in fade-in duration-300 mb-2">
-                <p className="text-sm sm:text-lg text-primary mb-1">Vote enregistré ! ✨</p>
-                <p className="text-xs sm:text-sm text-muted-foreground">En attente des autres joueurs...</p>
+                <p className="text-sm sm:text-lg text-accent mb-1 font-black">Vote enregistré ! ✨</p>
+                <p className="text-xs sm:text-sm text-muted-foreground font-medium">En attente des autres joueurs...</p>
                 {isHost && (
-                  <Button
-                    onClick={onForceAdvance}
-                    variant="outline"
-                    size="sm"
-                    className="mt-2 border-2"
-                  >
+                  <Button onClick={onForceAdvance} variant="outline" size="sm" className="mt-2">
                     <SkipForward className="mr-2 h-4 w-4" />
                     Forcer le passage
                   </Button>
@@ -184,72 +176,85 @@ export function VotingView({
             )}
 
             <div className="w-full animate-in fade-in slide-in-from-bottom-6 duration-500 delay-200">
-              {/* Vote options — 2 rows on mobile, wrapped on desktop */}
+              {/* Vote options */}
               <div className="grid grid-cols-3 sm:flex sm:flex-wrap gap-1.5 sm:gap-2 justify-center mb-2">
                 {voteOptions.map((option) => {
-                  const Icon = option.icon
                   const isSelected = selectedVote === option.id
 
+                  const selectedStyles: Record<string, string> = {
+                    destructive: "bg-destructive text-destructive-foreground border-destructive shadow-[2px_2px_0px_oklch(0.45_0.25_25)]",
+                    secondary: "bg-secondary text-secondary-foreground border-secondary shadow-[2px_2px_0px_oklch(0.65_0.2_90)]",
+                    primary: "bg-primary text-primary-foreground border-primary shadow-[2px_2px_0px_oklch(0.55_0.25_300)]",
+                    accent: "bg-accent text-accent-foreground border-accent shadow-[2px_2px_0px_oklch(0.6_0.22_145)]",
+                  }
+                  const hoverStyles: Record<string, string> = {
+                    destructive: "hover:border-destructive hover:text-destructive hover:bg-destructive/10",
+                    secondary: "hover:border-secondary hover:text-secondary-foreground hover:bg-secondary hover:shadow-[3px_3px_0px_oklch(0.65_0.2_90)]",
+                    primary: "hover:border-primary hover:text-primary hover:bg-primary/10",
+                    accent: "hover:border-accent hover:text-accent hover:bg-accent/10",
+                  }
+
                   return (
-                    <Button
+                    <button
                       key={option.id}
                       onClick={() => handleVote(option.id)}
                       disabled={hasVotedOnCurrent || isOwnMeme}
-                      variant={isSelected ? "default" : "outline"}
                       className={`
-                        sm:flex-1 sm:min-w-[130px] sm:max-w-[180px] h-auto py-1.5 px-1 sm:py-2 sm:px-3 flex flex-col items-center justify-center gap-0.5 border-2 transition-all duration-300
-                        ${isSelected ? "scale-105" : "hover:scale-105"}
-                        ${option.color === "destructive" && "hover:bg-destructive/20 hover:border-destructive hover:text-destructive"}
-                        ${option.color === "secondary" && "hover:bg-secondary/20 hover:border-secondary hover:text-secondary"}
-                        ${option.color === "primary" && "hover:bg-primary/20 hover:border-primary hover:text-primary"}
-                        ${option.color === "accent" && "hover:bg-accent/20 hover:border-accent hover:text-accent"}
-                        ${isSelected && option.color === "destructive" && "bg-destructive text-destructive-foreground border-destructive"}
-                        ${isSelected && option.color === "secondary" && "bg-secondary text-secondary-foreground border-secondary"}
-                        ${isSelected && option.color === "primary" && "bg-primary text-primary-foreground border-primary"}
-                        ${isSelected && option.color === "accent" && "bg-accent text-accent-foreground border-accent"}
-                        disabled:opacity-70
+                        sm:flex-1 sm:min-w-[120px] sm:max-w-[180px] h-auto py-1.5 px-1 sm:py-2.5 sm:px-3
+                        flex flex-col items-center justify-center gap-0.5
+                        border-2 rounded-lg font-bold text-center
+                        transition-all duration-150 select-none
+                        disabled:opacity-70 disabled:cursor-not-allowed
+                        shadow-[3px_3px_0px_var(--border)]
+                        active:translate-x-[2px] active:translate-y-[2px] active:shadow-none
+                        ${isSelected ? selectedStyles[option.color] + " translate-x-[2px] translate-y-[2px] shadow-none" : "border-border bg-card " + hoverStyles[option.color] + " hover:-translate-x-[1px] hover:-translate-y-[1px] hover:shadow-[4px_4px_0px_var(--border)]"}
                       `}
                     >
-                      <span className="text-[10px] sm:hidden font-bold text-center leading-tight">{option.shortLabel}</span>
-                      <span className="hidden sm:block text-xs sm:text-sm font-bold text-center leading-tight">{option.label}</span>
-                      <span className="text-[9px] sm:text-xs opacity-80">{option.points} pt{option.points > 1 ? "s" : ""}</span>
-                    </Button>
+                      <span className="text-[10px] sm:hidden font-black text-center leading-tight">{option.shortLabel}</span>
+                      <span className="hidden sm:block text-xs sm:text-sm font-black text-center leading-tight">{option.label}</span>
+                      <span className="text-[9px] sm:text-xs opacity-70 font-bold">{option.points} pt{option.points > 1 ? "s" : ""}</span>
+                    </button>
                   )
                 })}
-                {/* Heart vote — in the grid on mobile */}
-                <Button
+                {/* Heart vote — mobile */}
+                <button
                   onClick={() => handleVote("heart", true)}
                   disabled={hasVotedOnCurrent || isOwnMeme || hasUsedHeart}
-                  variant={selectedVote === "heart" ? "default" : "outline"}
                   className={`
-                    sm:hidden h-auto py-1.5 px-1 flex flex-col items-center justify-center gap-0.5 border-2 transition-all duration-300 rounded-lg
-                    ${hasUsedHeart && selectedVote !== "heart" ? "opacity-50 grayscale" : ""}
+                    sm:hidden h-auto py-1.5 px-1 flex flex-col items-center justify-center gap-0.5
+                    border-2 rounded-lg font-bold transition-all duration-150 select-none
+                    shadow-[3px_3px_0px_oklch(0.5_0.25_25_/_0.4)]
+                    active:translate-x-[2px] active:translate-y-[2px] active:shadow-none
+                    ${hasUsedHeart && selectedVote !== "heart" ? "opacity-50 grayscale border-red-500/30" : "border-red-500/60"}
                     ${selectedVote === "heart"
-                      ? "bg-red-500 text-white border-red-500 scale-105"
-                      : "hover:bg-red-500/20 hover:text-red-500 hover:border-red-500 border-red-500/50"}
+                      ? "bg-red-500 text-white border-red-500 translate-x-[2px] translate-y-[2px] shadow-none"
+                      : "bg-card hover:bg-red-500/10 hover:border-red-500 hover:-translate-x-[1px] hover:-translate-y-[1px] hover:shadow-[4px_4px_0px_oklch(0.5_0.25_25_/_0.4)]"}
                   `}
                 >
                   <span className="text-base">❤️</span>
-                  <span className="text-[9px] font-bold">+10</span>
+                  <span className="text-[9px] font-black">+10</span>
                   {hasUsedHeart && selectedVote !== "heart" && <span className="text-[8px] opacity-75">Utilisé</span>}
-                </Button>
+                </button>
               </div>
 
-              {/* Heart button — desktop only, full width bar */}
-              <div className="hidden sm:flex justify-center border-t border-border/50 pt-3 mt-1 relative">
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-background px-2 text-[10px] sm:text-xs font-bold text-muted-foreground uppercase tracking-widest">
+              {/* Heart button — desktop only */}
+              <div className="hidden sm:flex justify-center border-t-2 border-dashed border-border/50 pt-3 mt-1 relative">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-background px-3 text-[10px] font-black text-muted-foreground uppercase tracking-widest">
                   Ou alors...
                 </div>
-                <Button
+                <button
                   onClick={() => handleVote("heart", true)}
                   disabled={hasVotedOnCurrent || isOwnMeme || hasUsedHeart}
-                  variant={selectedVote === "heart" ? "default" : "outline"}
                   className={`
-                    h-12 sm:h-14 px-4 sm:px-8 text-sm sm:text-lg font-black border-2 transition-all duration-300 rounded-full
-                    ${hasUsedHeart && selectedVote !== "heart" ? "opacity-50 grayscale" : "shadow-[0_0_15px_rgba(239,68,68,0.5)]"}
+                    h-12 sm:h-14 px-6 sm:px-10 text-sm sm:text-lg font-black border-2 rounded-lg
+                    transition-all duration-150 select-none
+                    active:translate-x-[2px] active:translate-y-[2px]
+                    ${hasUsedHeart && selectedVote !== "heart"
+                      ? "opacity-50 grayscale border-red-500/30 shadow-none"
+                      : "shadow-[4px_4px_0px_oklch(0.5_0.25_25_/_0.5)]"}
                     ${selectedVote === "heart"
-                      ? "bg-red-500 text-white border-red-500 scale-105 shadow-[0_0_30px_rgba(239,68,68,0.8)]"
-                      : "hover:bg-red-500/20 hover:text-red-500 hover:border-red-500 hover:scale-105 border-red-500/50"}
+                      ? "bg-red-500 text-white border-red-500 translate-x-[2px] translate-y-[2px] shadow-none"
+                      : "border-red-500/60 hover:bg-red-500/10 hover:border-red-500 hover:text-red-400 hover:-translate-x-[1px] hover:-translate-y-[1px] hover:shadow-[6px_6px_0px_oklch(0.5_0.25_25_/_0.5)]"}
                   `}
                 >
                   <span className="text-2xl mr-2">❤️</span>
@@ -257,7 +262,7 @@ export function VotingView({
                   {hasUsedHeart && selectedVote !== "heart" && (
                     <span className="ml-2 text-xs font-normal opacity-75">(Déjà utilisé)</span>
                   )}
-                </Button>
+                </button>
               </div>
             </div>
           </>

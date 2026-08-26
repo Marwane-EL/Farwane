@@ -1,5 +1,5 @@
 "use client"
-
+import { useState, useEffect } from "react"
 import { HomeView } from "@/components/game/home-view"
 import { LobbyView } from "@/components/game/lobby-view"
 import { CreationView } from "@/components/game/creation-view"
@@ -10,6 +10,12 @@ import { useGameRoom } from "@/hooks/use-game-room"
 import { resetTetrisScore } from "@/components/game/tetris/TetrisGame"
 
 export default function MemeGame() {
+  const [mounted, setMounted] = useState(false)
+  
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   const {
     phase, roomCode, players, currentPlayer,
     settings, currentRound, playerScores,
@@ -30,32 +36,18 @@ export default function MemeGame() {
 
   return (
     <main className="h-[100dvh] w-full bg-background overflow-hidden flex flex-col relative">
-      {/* Grid dot pattern */}
-      <div className="fixed inset-0 grid-pattern opacity-60 pointer-events-none" />
-
-      {/* Floating particles */}
-      <div className="particles-container">
-        {[...Array(15)].map((_, i) => (
-          <div
-            key={i}
-            className="particle bg-primary/40"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              animationDuration: `${10 + Math.random() * 20}s`,
-              animationDelay: `${-Math.random() * 20}s`,
-            }}
-          />
-        ))}
-      </div>
-
-      {/* Aurora animated background */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none opacity-100">
+      {/* Dot texture background */}
+      <div className="fixed inset-0 dot-texture opacity-100 pointer-events-none" />
+      {/* Subtle grid overlay */}
+      <div className="fixed inset-0 grid-pattern opacity-40 pointer-events-none" />
+      {/* Aurora blobs — légers */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="aurora-blob aurora-blob-1" />
         <div className="aurora-blob aurora-blob-2" />
         <div className="aurora-blob aurora-blob-3" />
         <div className="aurora-blob aurora-blob-4" />
       </div>
+
       <div className="relative z-10 flex-1 w-full h-full flex flex-col overflow-hidden">
         {phase === "home" && (
           <HomeView

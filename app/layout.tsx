@@ -1,10 +1,13 @@
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import { Space_Grotesk } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
-const _geist = Geist({ subsets: ["latin"] });
-const _geistMono = Geist_Mono({ subsets: ["latin"] });
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
+  variable: "--font-space-grotesk",
+});
 
 export const metadata: Metadata = {
   title: 'Farwane - Créez des Memes entre Potes',
@@ -32,7 +35,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fr" className="dark">
-      <body className="font-sans antialiased">
+      <body className={`${spaceGrotesk.className} antialiased`}>
         {children}
         <Analytics />
       </body>

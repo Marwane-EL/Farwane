@@ -236,6 +236,65 @@ function CreatePackModal({ onClose, onCreated }: { onClose: () => void; onCreate
   )
 }
 
+// ─── Meme Thumbnail (with broken-URL detection) ───────────────────────────────
+
+function MemeThumb({
+  meme, index, isRemoving, onRemove,
+}: { meme: string; index: number; isRemoving: boolean; onRemove: () => void }) {
+  const [broken, setBroken] = useState(false)
+  const isVideo = /\.(mp4|webm|mov)(\?|$)/i.test(meme)
+
+  return (
+    <div className={`relative group aspect-square rounded-lg overflow-hidden bg-muted/40 border ${broken ? "border-destructive/60" : "border-border/40"}`}>
+      {isVideo ? (
+        <video
+          src={meme}
+          className="w-full h-full object-cover"
+          muted
+          loop
+          autoPlay
+          playsInline
+          onError={() => setBroken(true)}
+        />
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={meme}
+          alt={`Mème ${index + 1}`}
+          className="w-full h-full object-cover"
+          loading="lazy"
+          onError={() => setBroken(true)}
+        />
+      )}
+
+      {/* Broken overlay */}
+      {broken && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-destructive/20 border-2 border-destructive/50">
+          <span className="text-lg">❌</span>
+          <span className="text-[8px] font-bold text-destructive text-center leading-tight px-1">URL cassée</span>
+        </div>
+      )}
+
+      {/* Index badge */}
+      <span className={`absolute top-0.5 left-0.5 text-[9px] font-bold rounded px-1 leading-4 ${broken ? "bg-destructive/80 text-white" : "bg-background/80"}`}>
+        {index + 1}
+      </span>
+
+      {/* Remove button on hover */}
+      <button
+        onClick={onRemove}
+        disabled={isRemoving}
+        className="absolute inset-0 flex items-center justify-center bg-background/70 opacity-0 group-hover:opacity-100 transition-opacity"
+      >
+        {isRemoving
+          ? <Loader2 className="w-5 h-5 animate-spin text-destructive" />
+          : <X className="w-5 h-5 text-destructive" />
+        }
+      </button>
+    </div>
+  )
+}
+
 // ─── Pack Card ────────────────────────────────────────────────────────────────
 
 function PackCard({ pack, onUpdated, onDeleted }: { pack: MemePack; onUpdated: () => void; onDeleted: () => void }) {
@@ -411,30 +470,13 @@ function PackCard({ pack, onUpdated, onDeleted }: { pack: MemePack; onUpdated: (
               </label>
               <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-2">
                 {pack.memes.map((meme, index) => (
-                  <div key={index} className="relative group aspect-square rounded-lg overflow-hidden bg-muted/40 border border-border/40">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={meme}
-                      alt={`Mème ${index + 1}`}
-                      className="w-full h-full object-cover"
-                      loading="lazy"
-                    />
-                    {/* Index badge */}
-                    <span className="absolute top-0.5 left-0.5 text-[9px] font-bold bg-background/80 rounded px-1 leading-4">
-                      {index + 1}
-                    </span>
-                    {/* Remove button */}
-                    <button
-                      onClick={() => handleRemoveMeme(index)}
-                      disabled={removingIndex === index}
-                      className="absolute inset-0 flex items-center justify-center bg-background/70 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      {removingIndex === index
-                        ? <Loader2 className="w-5 h-5 animate-spin text-destructive" />
-                        : <X className="w-5 h-5 text-destructive" />
-                      }
-                    </button>
-                  </div>
+                  <MemeThumb
+                    key={index}
+                    meme={meme}
+                    index={index}
+                    isRemoving={removingIndex === index}
+                    onRemove={() => handleRemoveMeme(index)}
+                  />
                 ))}
               </div>
             </div>
