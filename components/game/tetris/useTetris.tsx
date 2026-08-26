@@ -46,6 +46,24 @@ export function useTetris(gameOverCallback: () => void, initialScore = 0) {
     return savedScore ? JSON.parse(savedScore) : 0;
   }
 
+  // Board persistence between rounds
+  function saveBoardToLocalStorage(boardShape: BoardShape, blocks: Block[]) {
+    localStorage.setItem("tetrisBoard", JSON.stringify(boardShape));
+    localStorage.setItem("tetrisUpcoming", JSON.stringify(blocks));
+  }
+  function loadBoardFromLocalStorage(): { board: BoardShape | null; blocks: Block[] | null } {
+    try {
+      const rawBoard = localStorage.getItem("tetrisBoard");
+      const rawBlocks = localStorage.getItem("tetrisUpcoming");
+      return {
+        board: rawBoard ? JSON.parse(rawBoard) : null,
+        blocks: rawBlocks ? JSON.parse(rawBlocks) : null,
+      };
+    } catch {
+      return { board: null, blocks: null };
+    }
+  }
+
   function getGhostPosition(): number {
     let ghostRow = droppingRow;
     while (!hasCollisions(board, droppingShape, ghostRow + 1, droppingColumn)) {
@@ -65,14 +83,28 @@ export function useTetris(gameOverCallback: () => void, initialScore = 0) {
       getRandomBlock(),
       getRandomBlock(),
     ];
-    // Resume from the saved cross-round score so difficulty scales continuously
+    // Récupère le score cumulé et l'état du plateau sauvegardés entre les rounds
     const resumeScore = loadScoreFromLocalStorage();
+    const { board: savedBoard, blocks: savedBlocks } = loadBoardFromLocalStorage();
+
     setScore(resumeScore);
-    setUpcomingBlocks(startingBlocks);
     setIsCommitting(false);
     setIsPlaying(true);
     setTickSpeed(getNormalTickSpeed(resumeScore));
-    dispatchBoardState({ type: "start" });
+
+    if (savedBoard && savedBlocks && savedBlocks.length >= 3) {
+      // Restaure le plateau et les blocs de la session précédente
+      setUpcomingBlocks(savedBlocks);
+      dispatchBoardState({
+        type: "restore",
+        newBoard: savedBoard,
+        newBlock: savedBlocks[savedBlocks.length - 1],
+      });
+    } else {
+      // Nouvelle partie vierge
+      setUpcomingBlocks(startingBlocks);
+      dispatchBoardState({ type: "start" });
+    }
   }, [dispatchBoardState]);
 
   const commitPosition = useCallback(() => {
@@ -107,6 +139,9 @@ export function useTetris(gameOverCallback: () => void, initialScore = 0) {
     if (hasCollisions(board, SHAPES[newBlock].shape, 0, 3)) {
       setIsPlaying(false);
       setTickSpeed(null);
+      // Efface l'état du plateau : le prochain "Rejouer" repart d'un plateau vide
+      localStorage.removeItem("tetrisBoard");
+      localStorage.removeItem("tetrisUpcoming");
       gameOverCallback(); // Call the gameOverCallback function when the game is over
     } else {
       setTickSpeed(getNormalTickSpeed(score + getPoints(numCleared)));
@@ -122,8 +157,12 @@ export function useTetris(gameOverCallback: () => void, initialScore = 0) {
     const newScore = score + getPoints(numCleared);
     setScore(newScore);
 
-    // Always persist the latest score so it survives round changes
+    // Persist score AND board state so both survive round transitions
     saveScoreToLocalStorage(newScore);
+    saveBoardToLocalStorage(
+      [...getEmptyBoard(BOARD_HEIGHT - newBoard.length), ...newBoard],
+      newUpcomingBlocks
+    );
   }, [
     board,
     dispatchBoardState,

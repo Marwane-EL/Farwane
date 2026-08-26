@@ -182,6 +182,132 @@
   background-clip: text;
 }
 
+/* ==========================================
+   AURORA ANIMATED BACKGROUND
+   ========================================== */
+
+@keyframes aurora-1 {
+  0%, 100% { transform: translate(0%, 0%) scale(1); opacity: 0.6; }
+  33% { transform: translate(4%, -6%) scale(1.08); opacity: 0.9; }
+  66% { transform: translate(-3%, 4%) scale(0.95); opacity: 0.5; }
+}
+@keyframes aurora-2 {
+  0%, 100% { transform: translate(0%, 0%) scale(1); opacity: 0.5; }
+  25% { transform: translate(-5%, 3%) scale(1.1); opacity: 0.8; }
+  75% { transform: translate(4%, -5%) scale(0.9); opacity: 0.4; }
+}
+@keyframes aurora-3 {
+  0%, 100% { transform: translate(0%, 0%) scale(1) rotate(0deg); opacity: 0.4; }
+  50% { transform: translate(3%, 5%) scale(1.15) rotate(8deg); opacity: 0.7; }
+}
+@keyframes aurora-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes particle-drift {
+  0% { transform: translateY(0px) translateX(0px); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 0.6; }
+  100% { transform: translateY(-120px) translateX(30px); opacity: 0; }
+}
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+@keyframes pulse-ring {
+  0% { transform: scale(0.8); opacity: 0.8; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+
+/* Aurora blob classes */
+.aurora-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(40px);
+  will-change: transform, opacity;
+  pointer-events: none;
+}
+.aurora-blob-1 {
+  width: 55vw;
+  height: 55vw;
+  max-width: 600px;
+  max-height: 600px;
+  background: radial-gradient(ellipse at center, oklch(0.75 0.25 300 / 0.5), transparent 70%);
+  top: -15%;
+  right: -10%;
+  animation: aurora-1 14s ease-in-out infinite;
+}
+.aurora-blob-2 {
+  width: 50vw;
+  height: 50vw;
+  max-width: 550px;
+  max-height: 550px;
+  background: radial-gradient(ellipse at center, oklch(0.8 0.22 145 / 0.45), transparent 70%);
+  bottom: -10%;
+  left: -8%;
+  animation: aurora-2 18s ease-in-out infinite;
+}
+.aurora-blob-3 {
+  width: 40vw;
+  height: 40vw;
+  max-width: 450px;
+  max-height: 450px;
+  background: radial-gradient(ellipse at center, oklch(0.85 0.2 90 / 0.4), transparent 70%);
+  top: 40%;
+  left: 50%;
+  transform: translateX(-50%);
+  animation: aurora-3 22s ease-in-out infinite;
+}
+.aurora-blob-4 {
+  width: 35vw;
+  height: 35vw;
+  max-width: 380px;
+  max-height: 380px;
+  background: radial-gradient(ellipse at center, oklch(0.75 0.25 350 / 0.35), transparent 70%);
+  top: 20%;
+  left: 5%;
+  animation: aurora-1 26s ease-in-out infinite reverse;
+}
+
+/* Shimmer text effect */
+.shimmer-text {
+  background: linear-gradient(
+    90deg,
+    var(--neon-purple) 0%,
+    var(--neon-yellow) 25%,
+    var(--neon-green) 50%,
+    var(--neon-purple) 75%,
+    var(--neon-yellow) 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer 4s linear infinite;
+}
+
+/* Floating particles */
+.particles-container {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.particle {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  animation: particle-drift linear infinite;
+}
+
+/* Grid dot pattern overlay */
+.grid-pattern {
+  background-image:
+    radial-gradient(circle, oklch(0.75 0.25 300 / 0.12) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
 /* Tetris Game Specific Styles */
 .tetris-game .row {
   display: flex;

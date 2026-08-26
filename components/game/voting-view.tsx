@@ -131,8 +131,8 @@ export function VotingView({
             </div>
 
             {/* Caption */}
-            <div className="w-full text-center p-2 rounded-xl bg-gradient-to-r from-primary/10 to-accent/10 border border-border/50 shrink-0">
-              <p className="text-base sm:text-xl md:text-2xl font-bold text-foreground leading-tight line-clamp-2">
+            <div className="w-full text-center p-2 rounded-xl bg-gradient-to-r from-primary/10 to-accent/10 border border-border/50 shrink-0 overflow-y-auto max-h-32 sm:max-h-40">
+              <p className="text-base sm:text-xl md:text-2xl font-bold text-foreground leading-tight break-words whitespace-pre-wrap">
                 {'"'}{meme.caption}{'"'}
               </p>
             </div>

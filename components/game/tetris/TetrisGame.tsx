@@ -14,6 +14,8 @@ const SCORE_KEY = "tetrisScore"
 export function resetTetrisScore() {
   if (typeof window !== "undefined") {
     localStorage.removeItem(SCORE_KEY)
+    localStorage.removeItem("tetrisBoard")
+    localStorage.removeItem("tetrisUpcoming")
   }
 }
 

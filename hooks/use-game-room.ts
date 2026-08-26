@@ -133,6 +133,22 @@ export function useGameRoom() {
           }
 
           setMemePacks(packs)
+
+          // Auto-select the pack (or user library) with the most memes
+          // This runs after packs load; libraries are loaded separately
+          const currentLibraries: MemeLibrary[] = JSON.parse(
+            localStorage.getItem("meme_libraries") || "[]"
+          )
+          const allOptions: MemePack[] = [
+            ...packs,
+            ...currentLibraries
+              .filter((lib) => lib.memes.length >= 3)
+              .map((lib) => ({ id: lib.id, name: lib.name, memes: lib.memes, isDefault: false })),
+          ]
+          if (allOptions.length > 0) {
+            const best = allOptions.reduce((a, b) => (b.memes.length > a.memes.length ? b : a))
+            setSelectedPack(best)
+          }
         }
       } catch {
         console.error("Failed to fetch meme packs")

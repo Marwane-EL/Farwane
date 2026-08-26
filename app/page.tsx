@@ -30,12 +30,32 @@ export default function MemeGame() {
 
   return (
     <main className="h-[100dvh] w-full bg-background overflow-hidden flex flex-col relative">
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary/20 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-accent/20 rounded-full blur-3xl animate-pulse delay-1000" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-secondary/10 rounded-full blur-3xl animate-pulse delay-500" />
+      {/* Grid dot pattern */}
+      <div className="fixed inset-0 grid-pattern opacity-60 pointer-events-none" />
+
+      {/* Floating particles */}
+      <div className="particles-container">
+        {[...Array(15)].map((_, i) => (
+          <div
+            key={i}
+            className="particle bg-primary/40"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              animationDuration: `${10 + Math.random() * 20}s`,
+              animationDelay: `${-Math.random() * 20}s`,
+            }}
+          />
+        ))}
       </div>
 
+      {/* Aurora animated background */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none opacity-100">
+        <div className="aurora-blob aurora-blob-1" />
+        <div className="aurora-blob aurora-blob-2" />
+        <div className="aurora-blob aurora-blob-3" />
+        <div className="aurora-blob aurora-blob-4" />
+      </div>
       <div className="relative z-10 flex-1 w-full h-full flex flex-col overflow-hidden">
         {phase === "home" && (
           <HomeView

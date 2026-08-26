@@ -94,7 +94,7 @@ function rotateBlock(shape: BlockShape): BlockShape {
 }
 
 type Action = {
-  type: "start" | "drop" | "commit" | "move";
+  type: "start" | "drop" | "commit" | "move" | "restore";
   newBoard?: BoardShape;
   newBlock?: Block;
   isPressingLeft?: boolean;
@@ -114,6 +114,16 @@ function boardReducer(state: BoardState, action: Action): BoardState {
         droppingColumn: 3,
         droppingBlock: firstBlock,
         droppingShape: SHAPES[firstBlock].shape,
+      };
+    case "restore":
+      // Restaure un plateau sauvegardé entre deux rounds
+      const restoreBlock = action.newBlock ?? getRandomBlock();
+      return {
+        board: action.newBoard ?? getEmptyBoard(),
+        droppingRow: 0,
+        droppingColumn: 3,
+        droppingBlock: restoreBlock,
+        droppingShape: SHAPES[restoreBlock].shape,
       };
     case "drop":
       newState.droppingRow++;
