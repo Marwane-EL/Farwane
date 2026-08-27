@@ -12,7 +12,8 @@ const DEFAULT_SETTINGS: GameSettings = {
   timerDuration: 90,
   totalRounds: 5,
   maxPlayers: 8,
-  nicheRoundRatio: 0, // disabled by default
+  gameMode: "classic",
+  maxRefreshes: 5,
 }
 
 function generateRoomCode(): string {
@@ -54,18 +55,30 @@ function assignRandomMemes(
   return assignments
 }
 
-// Pick a random unused niche if the random draw passes, or return null
+// Pick a niche according to game mode and max 2 occurrences rule
 function drawNiche(
   pool: import("@/types/game").NichePoolItem[],
-  usedIds: Set<string>,
-  ratio: number
+  usedCounts: Record<string, number>,
+  gameMode: import("@/types/game").GameMode
 ): import("@/types/game").NichePoolItem | null {
-  if (ratio <= 0 || pool.length === 0) return null
-  if (Math.random() >= ratio) return null
-  const available = pool.filter((n) => !usedIds.has(n.id))
-  if (available.length === 0) return null
-  const picked = available[Math.floor(Math.random() * available.length)]
-  usedIds.add(picked.id)
+  if (gameMode !== "niche" || pool.length === 0) return null
+
+  // A niche can appear at most 2 times in the entire game
+  const available = pool.filter((n) => (usedCounts[n.id] || 0) < 2)
+  if (available.length === 0) {
+    // If somehow all reached 2, fallback to least used
+    const minUsage = Math.min(...pool.map((n) => usedCounts[n.id] || 0))
+    const candidates = pool.filter((n) => (usedCounts[n.id] || 0) === minUsage)
+    const picked = candidates[Math.floor(Math.random() * candidates.length)]
+    usedCounts[picked.id] = (usedCounts[picked.id] || 0) + 1
+    return picked
+  }
+
+  // Prioritize niches with the fewest uses (e.g. 0 uses before 1 use)
+  const minUsage = Math.min(...available.map((n) => usedCounts[n.id] || 0))
+  const candidates = available.filter((n) => (usedCounts[n.id] || 0) === minUsage)
+  const picked = candidates[Math.floor(Math.random() * candidates.length)]
+  usedCounts[picked.id] = (usedCounts[picked.id] || 0) + 1
   return picked
 }
 
@@ -73,7 +86,7 @@ export function useGameRoom() {
   const channelRef = useRef<RealtimeChannel | null>(null)
   const playerIdRef = useRef<string>("")
   const usedMemeUrlsRef = useRef<Set<string>>(new Set())
-  const usedNicheIdsRef = useRef<Set<string>>(new Set())
+  const usedNicheCountRef = useRef<Record<string, number>>({})
 
   useEffect(() => {
     let id = sessionStorage.getItem("player_id")
@@ -186,7 +199,7 @@ export function useGameRoom() {
   const [submissions, setSubmissions] = useState<Meme[]>([])
   const [currentMemeIndex, setCurrentMemeIndex] = useState(0)
   const [hasSubmitted, setHasSubmitted] = useState(false)
-  const [refreshesLeft, setRefreshesLeft] = useState(10)
+  const [refreshesLeft, setRefreshesLeft] = useState(DEFAULT_SETTINGS.maxRefreshes)
   const [hasUsedHeart, setHasUsedHeart] = useState(false)
 
   // Synced voting state
@@ -260,7 +273,7 @@ export function useGameRoom() {
       setPlayerScores({})
       setSubmissions([])
       setHasSubmitted(false)
-      setRefreshesLeft(10)
+      setRefreshesLeft(payload.settings?.maxRefreshes ?? DEFAULT_SETTINGS.maxRefreshes)
       setCurrentNiche(payload.niche ?? null)
     })
 
@@ -311,7 +324,7 @@ export function useGameRoom() {
       setCurrentRound(payload.round)
       setSubmissions([])
       setHasSubmitted(false)
-      setRefreshesLeft(10)
+      setRefreshesLeft(payload.settings?.maxRefreshes ?? settings.maxRefreshes ?? DEFAULT_SETTINGS.maxRefreshes)
       setCurrentMemeIndex(0)
       setCurrentNiche(payload.niche ?? null)
     })
@@ -428,12 +441,12 @@ export function useGameRoom() {
     if (selectedPack.memes.length < 3) return
     await supabase.from("rooms").update({ status: "playing" }).eq("code", roomCode)
     usedMemeUrlsRef.current.clear()
-    usedNicheIdsRef.current.clear()
+    usedNicheCountRef.current = {}
     const playerIds = players.map((p) => p.id)
     const assignments = assignRandomMemes(playerIds, selectedPack.memes, usedMemeUrlsRef.current)
 
-    // Draw niche for round 1 (same random logic as all rounds — no special case)
-    const niche = drawNiche(nichePool, usedNicheIdsRef.current, settings.nicheRoundRatio)
+    // Draw niche for round 1
+    const niche = drawNiche(nichePool, usedNicheCountRef.current, settings.gameMode)
 
     setMyMemeUrl(assignments[playerIdRef.current] || "")
     setCurrentNiche(niche)
@@ -442,7 +455,7 @@ export function useGameRoom() {
     setPlayerScores({})
     setSubmissions([])
     setHasSubmitted(false)
-    setRefreshesLeft(10)
+    setRefreshesLeft(settings.maxRefreshes)
     setHasUsedHeart(false)
     channelRef.current.send({
       type: "broadcast", event: "game:start",
@@ -564,8 +577,8 @@ export function useGameRoom() {
       const playerIds = players.map((p) => p.id)
       const assignments = assignRandomMemes(playerIds, selectedPack.memes, usedMemeUrlsRef.current)
 
-      // Draw niche for next round (same random logic as round 1)
-      const niche = drawNiche(nichePool, usedNicheIdsRef.current, settings.nicheRoundRatio)
+      // Draw niche for next round
+      const niche = drawNiche(nichePool, usedNicheCountRef.current, settings.gameMode)
 
       setMyMemeUrl(assignments[playerIdRef.current] || "")
       setCurrentNiche(niche)
@@ -573,11 +586,11 @@ export function useGameRoom() {
       setCurrentRound(nextRoundNum)
       setSubmissions([])
       setHasSubmitted(false)
-      setRefreshesLeft(10)
+      setRefreshesLeft(settings.maxRefreshes)
       setCurrentMemeIndex(0)
       channelRef.current.send({
         type: "broadcast", event: "game:next-round",
-        payload: { assignments, round: nextRoundNum, niche },
+        payload: { assignments, round: nextRoundNum, niche, settings },
       })
     }
   }, [currentPlayer, selectedPack, currentRound, settings, playerScores, players, nichePool])
@@ -595,7 +608,7 @@ export function useGameRoom() {
     setHasUsedHeart(false)
     setCurrentNiche(null)
     // Keep nichePool so players don't have to re-add everything for a rematch
-    usedNicheIdsRef.current.clear()
+    usedNicheCountRef.current = {}
     usedMemeUrlsRef.current.clear()
     await supabase.from("rooms").update({ status: "waiting" }).eq("code", roomCode)
     channelRef.current.send({ type: "broadcast", event: "game:new-game", payload: {} })

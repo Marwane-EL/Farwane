@@ -12,7 +12,8 @@ interface NichePoolLobbyProps {
   nichePool: NichePoolItem[]
   currentPlayerId: string
   isHost: boolean
-  nicheRoundRatio: number
+  gameMode: "classic" | "niche"
+  minRequiredNiches: number
   personalNiches: NicheItem[]         // from useNicheLibrary
   onAdd: (text: string, saveToLibrary: boolean) => void
   onRemove: (id: string) => void
@@ -22,7 +23,8 @@ export function NichePoolLobby({
   nichePool,
   currentPlayerId,
   isHost,
-  nicheRoundRatio,
+  gameMode,
+  minRequiredNiches,
   personalNiches,
   onAdd,
   onRemove,
@@ -41,24 +43,31 @@ export function NichePoolLobby({
     onAdd(niche.text, false)
   }
 
-  const nicheEnabled = nicheRoundRatio > 0
-  const poolEmpty = nichePool.length === 0
+  const isNicheMode = gameMode === "niche"
+  const missingNiches = Math.max(0, minRequiredNiches - nichePool.length)
+  const hasEnough = nichePool.length >= minRequiredNiches
 
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2 text-xs text-muted-foreground font-bold uppercase tracking-wide">
         <Tag className="h-3.5 w-3.5 text-accent" />
         <span>Niches pour cette partie</span>
-        <span className="ml-auto bg-muted/50 px-2 py-0.5 rounded-full">
-          {nichePool.length} niche{nichePool.length !== 1 ? "s" : ""}
+        <span className={`ml-auto px-2 py-0.5 rounded-full text-xs font-bold ${
+          isNicheMode
+            ? hasEnough
+              ? "bg-accent/20 text-accent border border-accent/40"
+              : "bg-destructive/20 text-destructive border border-destructive/40"
+            : "bg-muted/50 text-muted-foreground"
+        }`}>
+          {nichePool.length} {isNicheMode ? `/ ${minRequiredNiches} min` : "niche" + (nichePool.length > 1 ? "s" : "")}
         </span>
       </div>
 
-      {/* Warning: niches enabled but pool empty */}
-      {nicheEnabled && poolEmpty && (
+      {/* Mode Niche requirements indicator */}
+      {isNicheMode && !hasEnough && (
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-secondary/15 border border-secondary/40 text-secondary text-xs font-bold">
           <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-          Ajoutez au moins 1 niche pour activer ce mode
+          <span>Ajoutez encore {missingNiches} niche{missingNiches > 1 ? "s" : ""} pour activer le Mode Niches ({minRequiredNiches} requises pour cette durée)</span>
         </div>
       )}
 

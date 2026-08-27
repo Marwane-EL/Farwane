@@ -105,6 +105,7 @@ export default function MemeGame() {
             onRefreshMeme={refreshMeme}
             refreshesLeft={refreshesLeft}
             currentNiche={currentNiche}
+            nichePool={nichePool}
           />
         )}
         {phase === "voting" && submissions.length > 0 && (

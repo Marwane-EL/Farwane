@@ -10,6 +10,7 @@ import { PokemonMemory } from "@/components/game/pokemon-memory"
 import { TetrisGame } from "@/components/game/tetris/TetrisGame"
 import { Gamepad2 } from "lucide-react"
 import { NicheRoundPrompt } from "@/components/game/niche-round-prompt"
+import { NicheLotteryOverlay } from "@/components/game/niche-lottery-overlay"
 import type { NichePoolItem } from "@/types/game"
 
 interface CreationViewProps {
@@ -26,6 +27,7 @@ interface CreationViewProps {
   onRefreshMeme: () => void
   refreshesLeft: number
   currentNiche: NichePoolItem | null
+  nichePool?: NichePoolItem[]
 }
 
 export function CreationView({
@@ -42,7 +44,9 @@ export function CreationView({
   onRefreshMeme,
   refreshesLeft,
   currentNiche,
+  nichePool = [],
 }: CreationViewProps) {
+  const [isLotteryActive, setIsLotteryActive] = useState(!!currentNiche)
   const [timeLeft, setTimeLeft] = useState(timerDuration)
   const [caption, setCaption] = useState("")
   const [activeMiniGame, setActiveMiniGame] = useState<"pokemon" | "tetris">("pokemon")
@@ -59,8 +63,10 @@ export function CreationView({
     onSubmitRef.current = onSubmit
   }, [onSubmit])
 
-  // Timer
+  // Timer (only ticks when lottery is not active)
   useEffect(() => {
+    if (isLotteryActive) return
+
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
@@ -74,7 +80,7 @@ export function CreationView({
       })
     }, 1000)
     return () => clearInterval(timer)
-  }, [])
+  }, [isLotteryActive])
 
   const handleSubmit = useCallback(() => {
     if (caption.trim()) {
@@ -190,8 +196,17 @@ export function CreationView({
 
       {/* Main content */}
       <div className="flex-1 flex flex-col items-center justify-center max-w-2xl mx-auto w-full min-h-0 animate-in fade-in slide-in-from-bottom-6 duration-500 delay-200">
-        {/* Niche prompt — shown when this round has a niche */}
-        {currentNiche && (
+        {/* Niche Lottery Animation Overlay */}
+        {isLotteryActive && currentNiche && (
+          <NicheLotteryOverlay
+            pool={nichePool}
+            targetNiche={currentNiche}
+            onComplete={() => setIsLotteryActive(false)}
+          />
+        )}
+
+        {/* Niche prompt — shown when this round has a niche (after lottery is done) */}
+        {!isLotteryActive && currentNiche && (
           <div className="w-full max-w-2xl mx-auto mb-1 sm:mb-2 shrink-0">
             <NicheRoundPrompt niche={currentNiche} />
           </div>

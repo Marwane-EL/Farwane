@@ -1,11 +1,16 @@
 export type GamePhase = "home" | "lobby" | "creation" | "voting" | "results" | "final-results"
 
+export type GameMode = "classic" | "niche"
+
 export interface GameSettings {
   timerDuration: number // seconds for creation phase
   totalRounds: number
   maxPlayers: number
-  nicheRoundRatio: number // 0 = disabled, 0.33 = ~1/3, 0.5 = ~1/2, 1 = every round
+  gameMode: GameMode // "classic" | "niche"
+  maxRefreshes: number // number of meme rerolls allowed per round
 }
+
+export const getMinNichesRequired = (totalRounds: number) => Math.ceil(totalRounds / 2)
 
 export interface Player {
   id: string
