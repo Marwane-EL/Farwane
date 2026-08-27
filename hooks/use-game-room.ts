@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react"
 import { supabase } from "@/lib/supabase"
 import type { RealtimeChannel } from "@supabase/supabase-js"
-import type { Player, Meme, MemePack, MemeLibrary, GamePhase, GameSettings } from "@/types/game"
+import type { Player, Meme, MemePack, MemeLibrary, GamePhase, GameSettings, NichePoolItem } from "@/types/game"
 
 
 const avatars = ["🎮", "🔥", "👑", "💀", "🚀", "🎲", "🎯", "⚡", "🌟", "🎪", "🦄", "🐉"]
@@ -12,6 +12,7 @@ const DEFAULT_SETTINGS: GameSettings = {
   timerDuration: 90,
   totalRounds: 5,
   maxPlayers: 8,
+  nicheRoundRatio: 0, // disabled by default
 }
 
 function generateRoomCode(): string {
@@ -53,10 +54,26 @@ function assignRandomMemes(
   return assignments
 }
 
+// Pick a random unused niche if the random draw passes, or return null
+function drawNiche(
+  pool: import("@/types/game").NichePoolItem[],
+  usedIds: Set<string>,
+  ratio: number
+): import("@/types/game").NichePoolItem | null {
+  if (ratio <= 0 || pool.length === 0) return null
+  if (Math.random() >= ratio) return null
+  const available = pool.filter((n) => !usedIds.has(n.id))
+  if (available.length === 0) return null
+  const picked = available[Math.floor(Math.random() * available.length)]
+  usedIds.add(picked.id)
+  return picked
+}
+
 export function useGameRoom() {
   const channelRef = useRef<RealtimeChannel | null>(null)
   const playerIdRef = useRef<string>("")
   const usedMemeUrlsRef = useRef<Set<string>>(new Set())
+  const usedNicheIdsRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     let id = sessionStorage.getItem("player_id")
@@ -79,6 +96,10 @@ export function useGameRoom() {
   const [settings, setSettings] = useState<GameSettings>(DEFAULT_SETTINGS)
   const [currentRound, setCurrentRound] = useState(1)
   const [playerScores, setPlayerScores] = useState<Record<string, number>>({})
+
+  // Niche state
+  const [nichePool, setNichePool] = useState<NichePoolItem[]>([])
+  const [currentNiche, setCurrentNiche] = useState<NichePoolItem | null>(null)
 
   // Meme packs from Supabase
   const [memePacks, setMemePacks] = useState<MemePack[]>([])
@@ -219,6 +240,16 @@ export function useGameRoom() {
       setSelectedPack(payload.pack)
     })
 
+    // Niche pool sync (any player can trigger, host broadcasts after every add/remove)
+    channel.on("broadcast", { event: "niche:pool-sync" }, ({ payload }) => {
+      setNichePool(payload.pool)
+    })
+
+    // Niche drawn for this round (host broadcasts at start of each round)
+    channel.on("broadcast", { event: "niche:round" }, ({ payload }) => {
+      setCurrentNiche(payload.niche ?? null)
+    })
+
     // Game start
     channel.on("broadcast", { event: "game:start" }, ({ payload }) => {
       setPhase("creation")
@@ -230,6 +261,7 @@ export function useGameRoom() {
       setSubmissions([])
       setHasSubmitted(false)
       setRefreshesLeft(10)
+      setCurrentNiche(payload.niche ?? null)
     })
 
     // Meme submitted
@@ -281,6 +313,7 @@ export function useGameRoom() {
       setHasSubmitted(false)
       setRefreshesLeft(10)
       setCurrentMemeIndex(0)
+      setCurrentNiche(payload.niche ?? null)
     })
 
     // Final results
@@ -300,6 +333,8 @@ export function useGameRoom() {
       setCurrentMemeIndex(0)
       setMyMemeUrl("")
       setHasUsedHeart(false)
+      setCurrentNiche(null)
+      // Note: nichePool is intentionally kept for the new game
     })
 
     channel.subscribe(async (status) => {
@@ -393,9 +428,15 @@ export function useGameRoom() {
     if (selectedPack.memes.length < 3) return
     await supabase.from("rooms").update({ status: "playing" }).eq("code", roomCode)
     usedMemeUrlsRef.current.clear()
+    usedNicheIdsRef.current.clear()
     const playerIds = players.map((p) => p.id)
     const assignments = assignRandomMemes(playerIds, selectedPack.memes, usedMemeUrlsRef.current)
+
+    // Draw niche for round 1 (same random logic as all rounds — no special case)
+    const niche = drawNiche(nichePool, usedNicheIdsRef.current, settings.nicheRoundRatio)
+
     setMyMemeUrl(assignments[playerIdRef.current] || "")
+    setCurrentNiche(niche)
     setPhase("creation")
     setCurrentRound(1)
     setPlayerScores({})
@@ -405,9 +446,9 @@ export function useGameRoom() {
     setHasUsedHeart(false)
     channelRef.current.send({
       type: "broadcast", event: "game:start",
-      payload: { pack: selectedPack, assignments, settings },
+      payload: { pack: selectedPack, assignments, settings, niche },
     })
-  }, [currentPlayer, selectedPack, roomCode, settings, players])
+  }, [currentPlayer, selectedPack, roomCode, settings, players, nichePool])
 
   const submitMeme = useCallback((caption: string) => {
     if (!channelRef.current || !currentPlayer || hasSubmitted) return
@@ -522,7 +563,12 @@ export function useGameRoom() {
       const nextRoundNum = currentRound + 1
       const playerIds = players.map((p) => p.id)
       const assignments = assignRandomMemes(playerIds, selectedPack.memes, usedMemeUrlsRef.current)
+
+      // Draw niche for next round (same random logic as round 1)
+      const niche = drawNiche(nichePool, usedNicheIdsRef.current, settings.nicheRoundRatio)
+
       setMyMemeUrl(assignments[playerIdRef.current] || "")
+      setCurrentNiche(niche)
       setPhase("creation")
       setCurrentRound(nextRoundNum)
       setSubmissions([])
@@ -531,10 +577,10 @@ export function useGameRoom() {
       setCurrentMemeIndex(0)
       channelRef.current.send({
         type: "broadcast", event: "game:next-round",
-        payload: { assignments, round: nextRoundNum },
+        payload: { assignments, round: nextRoundNum, niche },
       })
     }
-  }, [currentPlayer, selectedPack, currentRound, settings.totalRounds, playerScores, players])
+  }, [currentPlayer, selectedPack, currentRound, settings, playerScores, players, nichePool])
 
   const newGame = useCallback(async () => {
     if (!currentPlayer?.isHost || !channelRef.current) return
@@ -547,6 +593,9 @@ export function useGameRoom() {
     setCurrentMemeIndex(0)
     setMyMemeUrl("")
     setHasUsedHeart(false)
+    setCurrentNiche(null)
+    // Keep nichePool so players don't have to re-add everything for a rematch
+    usedNicheIdsRef.current.clear()
     usedMemeUrlsRef.current.clear()
     await supabase.from("rooms").update({ status: "waiting" }).eq("code", roomCode)
     channelRef.current.send({ type: "broadcast", event: "game:new-game", payload: {} })
@@ -600,6 +649,37 @@ export function useGameRoom() {
     return () => { if (channelRef.current) supabase.removeChannel(channelRef.current) }
   }, [])
 
+  // ─── Niche pool actions ──────────────────────────────────────────────────────
+
+  const addNicheToPool = useCallback((text: string, playerId: string) => {
+    if (!channelRef.current) return
+    const clean = text.trim().slice(0, 100)
+    if (!clean) return
+    setNichePool((prev) => {
+      // Dedup (case-insensitive)
+      if (prev.some((n) => n.text.toLowerCase() === clean.toLowerCase())) return prev
+      const next: NichePoolItem[] = [
+        ...prev,
+        { id: `n_${Math.random().toString(36).slice(2, 8)}`, text: clean, addedBy: playerId },
+      ]
+      channelRef.current?.send({ type: "broadcast", event: "niche:pool-sync", payload: { pool: next } })
+      return next
+    })
+  }, [])
+
+  const removeNicheFromPool = useCallback((id: string, requesterId: string, isHost: boolean) => {
+    if (!channelRef.current) return
+    setNichePool((prev) => {
+      const target = prev.find((n) => n.id === id)
+      if (!target) return prev
+      // Only host or the original adder can remove
+      if (!isHost && target.addedBy !== requesterId) return prev
+      const next = prev.filter((n) => n.id !== id)
+      channelRef.current?.send({ type: "broadcast", event: "niche:pool-sync", payload: { pool: next } })
+      return next
+    })
+  }, [])
+
   // Refresh meme functionality
   const refreshMeme = useCallback(() => {
     if (refreshesLeft <= 0 || !selectedPack || hasSubmitted) return
@@ -626,6 +706,7 @@ export function useGameRoom() {
     submissions, currentMemeIndex, hasSubmitted,
     hasVotedOnCurrent, currentVoters, hasUsedHeart,
     error, isLoading, libraries,
+    nichePool, currentNiche,
     createRoom, joinRoom, leaveRoom,
     updateSettings, selectPack, startGame,
     submitMeme, moveToVoting, vote,
@@ -633,5 +714,6 @@ export function useGameRoom() {
     refreshMeme, refreshesLeft,
     setError,
     createLibrary, deleteLibrary, addMemeToLibrary, removeMemeFromLibrary,
+    addNicheToPool, removeNicheFromPool,
   }
 }

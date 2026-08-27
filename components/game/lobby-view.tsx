@@ -10,7 +10,8 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu"
-import type { Player, MemeLibrary, MemePack, GameSettings } from "@/types/game"
+import type { Player, MemeLibrary, MemePack, GameSettings, NichePoolItem, NicheItem } from "@/types/game"
+import { NichePoolLobby } from "@/components/game/niche-pool-lobby"
 
 interface LobbyViewProps {
   roomCode: string
@@ -20,8 +21,12 @@ interface LobbyViewProps {
   userLibraries: MemeLibrary[]
   selectedPack: MemePack | null
   settings: GameSettings
+  nichePool: NichePoolItem[]
+  personalNiches: NicheItem[]
   onSelectPack: (pack: MemePack) => void
   onUpdateSettings: (settings: GameSettings) => void
+  onAddNiche: (text: string, saveToLibrary: boolean) => void
+  onRemoveNiche: (id: string) => void
   onStartGame: () => void
   onLeave: () => void
 }
@@ -29,7 +34,8 @@ interface LobbyViewProps {
 export function LobbyView({
   roomCode, players, currentPlayer, memePacks,
   userLibraries, selectedPack, settings,
-  onSelectPack, onUpdateSettings, onStartGame, onLeave,
+  nichePool, personalNiches,
+  onSelectPack, onUpdateSettings, onAddNiche, onRemoveNiche, onStartGame, onLeave,
 }: LobbyViewProps) {
   const [copied, setCopied] = useState(false)
 
@@ -173,6 +179,61 @@ export function LobbyView({
                     ))}
                   </div>
                 </div>
+
+                {/* Niche ratio */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground font-bold uppercase tracking-wide">
+                      <span>🎯</span>
+                      <span>Niches aux rounds</span>
+                    </div>
+                    {/* Toggle ON/OFF */}
+                    <button
+                      onClick={() => onUpdateSettings({ ...settings, nicheRoundRatio: settings.nicheRoundRatio > 0 ? 0 : 0.5 })}
+                      className={`relative w-10 h-5 rounded-full border-2 transition-colors ${
+                        settings.nicheRoundRatio > 0
+                          ? "bg-accent border-accent"
+                          : "bg-muted border-border"
+                      }`}
+                    >
+                      <span className={`absolute top-0.5 left-0.5 w-3.5 h-3.5 rounded-full bg-white shadow transition-transform ${
+                        settings.nicheRoundRatio > 0 ? "translate-x-5" : "translate-x-0"
+                      }`} />
+                    </button>
+                  </div>
+                  {settings.nicheRoundRatio > 0 && (
+                    <div className="flex gap-2">
+                      {([0.33, 0.5, 1] as const).map((ratio) => (
+                        <Button
+                          key={ratio}
+                          size="sm"
+                          variant={settings.nicheRoundRatio === ratio ? "accent" : "outline"}
+                          onClick={() => onUpdateSettings({ ...settings, nicheRoundRatio: ratio })}
+                          className="flex-1 h-8 font-black text-xs"
+                        >
+                          {ratio === 0.33 ? "~1/3" : ratio === 0.5 ? "1/2" : "Tous"}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Niche pool */}
+            <Card className="border-2 border-accent/40 shadow-[4px_4px_0px_oklch(0.6_0.22_145_/_0.3)]">
+              <CardContent className="p-3 sm:p-4">
+                <NichePoolLobby
+                  nichePool={nichePool}
+                  currentPlayerId={currentPlayer?.id ?? ""}
+                  isHost={isHost ?? false}
+                  nicheRoundRatio={settings.nicheRoundRatio}
+                  personalNiches={personalNiches}
+                  onAdd={(text, save) => {
+                    onAddNiche(text, save)
+                  }}
+                  onRemove={onRemoveNiche}
+                />
               </CardContent>
             </Card>
           </div>
@@ -192,6 +253,21 @@ export function LobbyView({
               <div className="flex items-center gap-4 text-sm text-muted-foreground font-medium">
                 <span className="flex items-center gap-1"><Timer className="h-4 w-4" /> {settings.timerDuration}s</span>
                 <span className="flex items-center gap-1"><Hash className="h-4 w-4" /> {settings.totalRounds} manches</span>
+                {settings.nicheRoundRatio > 0 && (
+                  <span className="flex items-center gap-1">🎯 Niches actives</span>
+                )}
+              </div>
+              {/* Non-host can also add niches to the pool */}
+              <div className="pt-1 border-t border-border/40">
+                <NichePoolLobby
+                  nichePool={nichePool}
+                  currentPlayerId={currentPlayer?.id ?? ""}
+                  isHost={false}
+                  nicheRoundRatio={settings.nicheRoundRatio}
+                  personalNiches={personalNiches}
+                  onAdd={(text, save) => onAddNiche(text, save)}
+                  onRemove={onRemoveNiche}
+                />
               </div>
             </CardContent>
           </Card>

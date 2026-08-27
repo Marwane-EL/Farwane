@@ -21,6 +21,8 @@ import {
   Palette
 } from "lucide-react"
 import type { MemeLibrary } from "@/types/game"
+import { NicheLibraryPanel } from "@/components/game/niche-library-panel"
+import { useNicheLibrary } from "@/hooks/use-niche-library"
 
 interface HomeViewProps {
   onCreateGame: (pseudo: string) => void
@@ -54,6 +56,8 @@ export function HomeView({
   const [newLibraryName, setNewLibraryName] = useState("")
   const [expandedLibrary, setExpandedLibrary] = useState<string | null>(null)
   const [newMemeUrl, setNewMemeUrl] = useState("")
+
+  const { niches, addNiche, editNiche, deleteNiche } = useNicheLibrary()
 
   const handleJoin = (e: React.FormEvent) => {
     e.preventDefault()
@@ -336,6 +340,16 @@ export function HomeView({
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Niche Library */}
+          <div className="w-full max-w-lg mb-4 animate-in fade-in slide-in-from-bottom-6 duration-500 delay-300 shrink-0">
+            <NicheLibraryPanel
+              niches={niches}
+              onAdd={addNiche}
+              onEdit={editNiche}
+              onDelete={deleteNiche}
+            />
           </div>
 
         </div>

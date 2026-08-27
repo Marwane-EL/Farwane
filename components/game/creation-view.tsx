@@ -9,6 +9,8 @@ import { MemeMedia } from "@/components/game/meme-media"
 import { PokemonMemory } from "@/components/game/pokemon-memory"
 import { TetrisGame } from "@/components/game/tetris/TetrisGame"
 import { Gamepad2 } from "lucide-react"
+import { NicheRoundPrompt } from "@/components/game/niche-round-prompt"
+import type { NichePoolItem } from "@/types/game"
 
 interface CreationViewProps {
   currentMemeUrl: string
@@ -23,6 +25,7 @@ interface CreationViewProps {
   totalRounds: number
   onRefreshMeme: () => void
   refreshesLeft: number
+  currentNiche: NichePoolItem | null
 }
 
 export function CreationView({
@@ -38,6 +41,7 @@ export function CreationView({
   totalRounds,
   onRefreshMeme,
   refreshesLeft,
+  currentNiche,
 }: CreationViewProps) {
   const [timeLeft, setTimeLeft] = useState(timerDuration)
   const [caption, setCaption] = useState("")
@@ -186,6 +190,13 @@ export function CreationView({
 
       {/* Main content */}
       <div className="flex-1 flex flex-col items-center justify-center max-w-2xl mx-auto w-full min-h-0 animate-in fade-in slide-in-from-bottom-6 duration-500 delay-200">
+        {/* Niche prompt — shown when this round has a niche */}
+        {currentNiche && (
+          <div className="w-full max-w-2xl mx-auto mb-1 sm:mb-2 shrink-0">
+            <NicheRoundPrompt niche={currentNiche} />
+          </div>
+        )}
+
         {/* Meme Image */}
         <Card className="w-full flex-1 min-h-0 border-2 border-border shadow-[4px_4px_0px_var(--border)] mb-1 sm:mb-4 flex flex-col py-0 gap-0">
           <CardContent className="p-3 sm:p-4 flex flex-col items-center flex-1 min-h-0">

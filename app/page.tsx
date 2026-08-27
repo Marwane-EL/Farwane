@@ -7,6 +7,7 @@ import { VotingView } from "@/components/game/voting-view"
 import { ResultsView } from "@/components/game/results-view"
 import { FinalResultsView } from "@/components/game/final-results-view"
 import { useGameRoom } from "@/hooks/use-game-room"
+import { useNicheLibrary } from "@/hooks/use-niche-library"
 import { resetTetrisScore } from "@/components/game/tetris/TetrisGame"
 
 export default function MemeGame() {
@@ -24,6 +25,7 @@ export default function MemeGame() {
     submissions, currentMemeIndex, hasSubmitted,
     hasVotedOnCurrent, currentVoters, hasUsedHeart,
     error, isLoading, libraries,
+    nichePool, currentNiche,
     createRoom, joinRoom, leaveRoom,
     updateSettings, selectPack, startGame,
     submitMeme, moveToVoting, vote,
@@ -31,7 +33,10 @@ export default function MemeGame() {
     refreshMeme, refreshesLeft,
     setError,
     createLibrary, deleteLibrary, addMemeToLibrary, removeMemeFromLibrary,
+    addNicheToPool, removeNicheFromPool,
   } = useGameRoom()
+
+  const { niches: personalNiches, addNiche: addToPersonalLibrary } = useNicheLibrary()
 
 
   return (
@@ -72,8 +77,15 @@ export default function MemeGame() {
             userLibraries={libraries}
             selectedPack={selectedPack}
             settings={settings}
+            nichePool={nichePool}
+            personalNiches={personalNiches}
             onSelectPack={selectPack}
             onUpdateSettings={updateSettings}
+            onAddNiche={(text, save) => {
+              addNicheToPool(text, currentPlayer?.id ?? "")
+              if (save) addToPersonalLibrary(text)
+            }}
+            onRemoveNiche={(id) => removeNicheFromPool(id, currentPlayer?.id ?? "", currentPlayer?.isHost ?? false)}
             onStartGame={() => { resetTetrisScore(); startGame(); }}
             onLeave={() => { resetTetrisScore(); leaveRoom(); }}
           />
@@ -92,6 +104,7 @@ export default function MemeGame() {
             totalRounds={settings.totalRounds}
             onRefreshMeme={refreshMeme}
             refreshesLeft={refreshesLeft}
+            currentNiche={currentNiche}
           />
         )}
         {phase === "voting" && submissions.length > 0 && (
