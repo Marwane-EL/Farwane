@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { normalizeMemeUrls } from "@/lib/utils"
 
 function getAdminClient() {
   return createClient(
@@ -35,7 +36,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   if (fetchErr || !pack) return NextResponse.json({ error: "Pack not found" }, { status: 404 })
 
-  const updatedMemes = [...(pack.memes as string[]), ...memes]
+  const normalizedMemes = await normalizeMemeUrls(memes)
+  const updatedMemes = [...(pack.memes as string[]), ...normalizedMemes]
   const { data, error } = await supabase
     .from("meme_packs")
     .update({ memes: updatedMemes })

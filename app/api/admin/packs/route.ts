@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { normalizeMemeUrls } from "@/lib/utils"
 
 // Server-side Supabase client using service role for admin operations
 function getAdminClient() {
@@ -42,9 +43,10 @@ export async function POST(req: Request) {
   }
 
   const supabase = getAdminClient()
+  const normalizedMemes = await normalizeMemeUrls(memes)
   const { data, error } = await supabase
     .from("meme_packs")
-    .insert({ name: name.trim(), memes, is_default: true })
+    .insert({ name: name.trim(), memes: normalizedMemes, is_default: true })
     .select()
     .single()
 

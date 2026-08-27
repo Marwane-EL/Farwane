@@ -1,0 +1,1 @@
+dans la page admin, rajoute un bouton supprimer les url invalides, pour permettre de vider les image/vidéo qui ne fonctionne plus

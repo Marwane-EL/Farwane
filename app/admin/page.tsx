@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import {
   Shield, LogOut, Plus, Trash2, ChevronDown, ChevronUp,
   Eye, EyeOff, Package, ImageIcon, X, Loader2,
-  Upload, Sparkles, Check, AlertCircle, RefreshCw, Link
+  Upload, Sparkles, Check, AlertCircle, RefreshCw, Link, Copy, Wand2
 } from "lucide-react"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -236,25 +236,43 @@ function CreatePackModal({ onClose, onCreated }: { onClose: () => void; onCreate
   )
 }
 
-// ─── Meme Thumbnail (with broken-URL detection) ───────────────────────────────
-
+// ─── Meme Thumbnail (first-frame preview for videos, lazy for images) ─────────
 function MemeThumb({
   meme, index, isRemoving, onRemove,
 }: { meme: string; index: number; isRemoving: boolean; onRemove: () => void }) {
   const [broken, setBroken] = useState(false)
+  const [loaded, setLoaded] = useState(false)
+  const [copied, setCopied] = useState(false)
   const isVideo = /\.(mp4|webm|mov)(\?|$)/i.test(meme)
+
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    navigator.clipboard.writeText(meme)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   return (
     <div className={`relative group aspect-square rounded-lg overflow-hidden bg-muted/40 border ${broken ? "border-destructive/60" : "border-border/40"}`}>
+
+      {/* Shimmer skeleton — visible until media is ready */}
+      {!loaded && !broken && (
+        <div className="absolute inset-0 bg-gradient-to-r from-muted/60 via-muted/30 to-muted/60 animate-pulse" />
+      )}
+
       {isVideo ? (
+        // preload="metadata" fetches only the container header (a few KB).
+        // Setting currentTime=0.1 on loadedmetadata renders the first frame
+        // without ever starting playback → real thumbnail, minimal bandwidth.
         <video
           src={meme}
           className="w-full h-full object-cover"
           muted
-          loop
-          autoPlay
           playsInline
-          onError={() => setBroken(true)}
+          preload="metadata"
+          onLoadedMetadata={(e) => { (e.target as HTMLVideoElement).currentTime = 0.1 }}
+          onSeeked={() => setLoaded(true)}
+          onError={() => { setBroken(true); setLoaded(true) }}
         />
       ) : (
         // eslint-disable-next-line @next/next/no-img-element
@@ -263,7 +281,8 @@ function MemeThumb({
           alt={`Mème ${index + 1}`}
           className="w-full h-full object-cover"
           loading="lazy"
-          onError={() => setBroken(true)}
+          onLoad={() => setLoaded(true)}
+          onError={() => { setBroken(true); setLoaded(true) }}
         />
       )}
 
@@ -280,17 +299,34 @@ function MemeThumb({
         {index + 1}
       </span>
 
-      {/* Remove button on hover */}
-      <button
-        onClick={onRemove}
-        disabled={isRemoving}
-        className="absolute inset-0 flex items-center justify-center bg-background/70 opacity-0 group-hover:opacity-100 transition-opacity"
-      >
-        {isRemoving
-          ? <Loader2 className="w-5 h-5 animate-spin text-destructive" />
-          : <X className="w-5 h-5 text-destructive" />
-        }
-      </button>
+      {/* Video badge */}
+      {isVideo && !broken && loaded && (
+        <span className="absolute bottom-0.5 right-0.5 text-[8px] font-bold bg-background/80 rounded px-1 leading-4 text-muted-foreground">
+          VID
+        </span>
+      )}
+
+      {/* Action buttons on hover */}
+      <div className="absolute inset-0 flex items-center justify-center gap-2 bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button
+          onClick={handleCopy}
+          title="Copier le lien"
+          className="p-1.5 bg-background rounded-full hover:scale-110 transition-transform shadow-sm"
+        >
+          {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4 text-foreground" />}
+        </button>
+        <button
+          onClick={onRemove}
+          disabled={isRemoving}
+          title="Supprimer"
+          className="p-1.5 bg-background rounded-full hover:scale-110 transition-transform shadow-sm"
+        >
+          {isRemoving
+            ? <Loader2 className="w-4 h-4 animate-spin text-destructive" />
+            : <Trash2 className="w-4 h-4 text-destructive" />
+          }
+        </button>
+      </div>
     </div>
   )
 }
@@ -302,6 +338,8 @@ function PackCard({ pack, onUpdated, onDeleted }: { pack: MemePack; onUpdated: (
   const [addUrlsText, setAddUrlsText] = useState("")
   const [addLoading, setAddLoading] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const [fixLoading, setFixLoading] = useState(false)
+  const [fixProgress, setFixProgress] = useState<{ processed: number; total: number } | null>(null)
   const [removingIndex, setRemovingIndex] = useState<number | null>(null)
   const [feedback, setFeedback] = useState<{ type: "ok" | "err"; msg: string } | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -363,6 +401,52 @@ function PackCard({ pack, onUpdated, onDeleted }: { pack: MemePack; onUpdated: (
     }
   }
 
+  const handleFixUrls = async () => {
+    setFixLoading(true)
+    setFixProgress({ processed: 0, total: pack.memes.length })
+    try {
+      const res = await adminFetch(`/api/admin/packs/${pack.id}/fix`, { method: "POST" })
+      if (!res.ok || !res.body) {
+        showFeedback("err", "Erreur de connexion au serveur")
+        return
+      }
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ""
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+
+        // Parse SSE lines
+        const lines = buffer.split("\n")
+        buffer = lines.pop() ?? ""
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue
+          try {
+            const evt = JSON.parse(line.slice(6))
+            if (evt.error) {
+              showFeedback("err", evt.error)
+            } else if (evt.done) {
+              showFeedback("ok", evt.fixedCount > 0 ? `${evt.fixedCount} URL(s) réparée(s) !` : "Aucune URL à réparer")
+              onUpdated()
+            } else if (typeof evt.processed === "number") {
+              setFixProgress({ processed: evt.processed, total: evt.total })
+            }
+          } catch { /* malformed line, skip */ }
+        }
+      }
+    } catch {
+      showFeedback("err", "Erreur réseau")
+    } finally {
+      setFixLoading(false)
+      setFixProgress(null)
+    }
+  }
+
   return (
     <div className="bg-card/50 backdrop-blur-sm border-2 border-border/50 rounded-2xl overflow-hidden transition-all duration-300 hover:border-border">
       {/* Pack Header */}
@@ -388,8 +472,9 @@ function PackCard({ pack, onUpdated, onDeleted }: { pack: MemePack; onUpdated: (
           }
         </button>
 
-        {/* Delete Pack */}
+        {/* Pack Actions */}
         <div className="flex items-center gap-2 ml-3 shrink-0">
+          
           {confirmDelete ? (
             <>
               <button
@@ -433,6 +518,38 @@ function PackCard({ pack, onUpdated, onDeleted }: { pack: MemePack; onUpdated: (
       {/* Expanded Content */}
       {expanded && (
         <div className="border-t border-border/40 px-5 py-4 space-y-5">
+
+          {/* ── Réparer les URLs ─────────────────────────────── */}
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={handleFixUrls}
+              disabled={fixLoading}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-accent/40 bg-accent/10 text-accent hover:bg-accent/20 hover:border-accent/60 disabled:opacity-60 disabled:cursor-not-allowed transition-all text-sm font-bold w-full justify-center"
+            >
+              {fixLoading
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : <Wand2 className="w-4 h-4" />
+              }
+              {fixLoading ? "Réparation en cours..." : "Réparer les URLs"}
+            </button>
+
+            {/* Progress bar — visible during fix */}
+            {fixProgress && (
+              <div className="space-y-1">
+                <div className="h-2 w-full rounded-full bg-muted/50 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-accent to-primary transition-all duration-300"
+                    style={{ width: `${fixProgress.total > 0 ? Math.round((fixProgress.processed / fixProgress.total) * 100) : 0}%` }}
+                  />
+                </div>
+                <p className="text-[10px] text-muted-foreground text-center">
+                  {fixProgress.processed} / {fixProgress.total} URL{fixProgress.total > 1 ? "s" : ""} analysées
+                </p>
+              </div>
+            )}
+          </div>
+
           {/* Add memes */}
           <form onSubmit={handleAddMemes} className="space-y-2">
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
