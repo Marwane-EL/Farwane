@@ -745,7 +745,7 @@ export function useGameRoom() {
   const submitMeme = useCallback((caption: string) => {
     if (!channelRef.current || !currentPlayer || hasSubmitted) return
     const pseudo = settings.gameMode === "incognito"
-      ? (codenamesRef.current[currentPlayer.id] || codenames[currentPlayer.id] || "Auteur Secret 🕵️")
+      ? "Anonyme 👻"
       : currentPlayer.pseudo
 
     const meme: Meme = {

@@ -155,7 +155,7 @@ export function VotingView({
 
             {/* Anonymous indicator */}
             <p className="text-xs text-muted-foreground shrink-0 font-medium">
-              {isIncognito ? "Créé par un agent incognito 🕵️" : "Créé par un joueur anonyme 🎭"}
+              {isIncognito ? "Mode Fantôme : auteur anonyme 👻" : "Créé par un joueur anonyme 🎭"}
             </p>
           </div>
         </CardContent>

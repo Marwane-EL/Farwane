@@ -90,7 +90,7 @@ export function ResultsView({
             </span>
             {isIncognito && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-secondary/50 bg-secondary/15 text-[11px] font-black text-secondary">
-                <EyeOff className="h-3 w-3" /> Incognito
+                <EyeOff className="h-3 w-3" /> Mode Fantôme
               </span>
             )}
             {roomCode && <RoomCodeBadge roomCode={roomCode} />}
@@ -113,7 +113,7 @@ export function ResultsView({
             const Icon = config.icon
             const isCurrentAuthor = isIncognito && meme.playerId === currentPlayerId
             const authorDisplayName = isIncognito
-              ? `${codenames?.[meme.playerId] || meme.playerPseudo}${isCurrentAuthor ? " (toi)" : ""}`
+              ? (isCurrentAuthor ? "C'était toi ! 🎉" : "Mème anonyme 👻")
               : meme.playerPseudo
             return (
               <div key={meme.id} className="flex flex-col items-center flex-1 animate-in fade-in zoom-in-95 duration-500" style={{ animationDelay: `${(visualIndex + 1) * 200}ms` }}>
@@ -125,7 +125,9 @@ export function ResultsView({
                     <div className="w-full aspect-square rounded-md overflow-hidden mb-1.5 bg-muted/50 border border-border/30">
                       <MemeMedia src={meme.imageUrl} alt={`Meme de ${authorDisplayName}`} className="w-full h-full object-cover" forceMuted />
                     </div>
-                    <p className="font-black text-xs sm:text-sm truncate">{authorDisplayName}</p>
+                    <p className={`font-black text-xs sm:text-sm truncate ${isIncognito && isCurrentAuthor ? "text-accent" : ""}`}>
+                      {authorDisplayName}
+                    </p>
                     <p className={`text-base sm:text-xl font-black ${config.textColor}`}>{meme.votes} pts</p>
                   </div>
                 </div>
@@ -146,24 +148,25 @@ export function ResultsView({
             <CardContent className="p-3 sm:p-4">
               <h3 className="text-center font-black text-xs sm:text-sm text-muted-foreground uppercase tracking-widest mb-3 flex items-center justify-center gap-2">
                 <Star className="h-4 w-4 text-secondary" />
-                Classement général
+                {isIncognito ? "Classement Fantôme 👻" : "Classement général"}
               </h3>
               <div className="space-y-2">
                 {leaderboard.map((player, i) => {
                   const isCurrent = player.id === currentPlayerId
-                  const codename = codenames?.[player.id] || "Agent Mystère 🕵️"
-                  const displayName = isIncognito ? (isCurrent ? `${codename} (toi)` : codename) : player.pseudo
-                  const displayAvatar = isIncognito ? "🕵️" : player.avatar
+                  const displayName = isIncognito ? (isCurrent ? `${player.pseudo} (toi)` : "???") : player.pseudo
+                  const displayAvatar = isIncognito ? (isCurrent ? player.avatar : "👻") : player.avatar
                   return (
                     <div key={player.id} className={`flex items-center gap-2 sm:gap-3 px-3 py-2 rounded-lg border-2 transition-all ${
                       i === 0 ? "border-yellow-400/60 bg-yellow-400/10 shadow-[2px_2px_0px_oklch(0.85_0.19_95_/_0.4)]" :
                       i === 1 ? "border-gray-400/40 bg-gray-400/5" :
                       i === 2 ? "border-orange-400/40 bg-orange-400/5" :
                       "border-border/40 bg-muted/20"
-                    } ${isCurrent && isIncognito ? "ring-2 ring-primary/60" : ""}`}>
+                    } ${isCurrent && isIncognito ? "ring-2 ring-primary/60 bg-primary/10 border-primary/50" : ""}`}>
                       <span className="text-xs sm:text-sm font-black text-muted-foreground w-5">{i + 1}.</span>
                       <span className="text-base sm:text-lg">{displayAvatar}</span>
-                      <span className="font-bold text-sm flex-1 truncate">{displayName}</span>
+                      <span className={`font-bold text-sm flex-1 truncate ${isIncognito && !isCurrent ? "text-muted-foreground tracking-widest font-mono" : ""}`}>
+                        {displayName}
+                      </span>
                       <span className="font-black text-primary text-sm sm:text-base shrink-0">{player.totalScore} pts</span>
                     </div>
                   )

@@ -39,7 +39,7 @@ export function FinalResultsView({
           <div className="flex items-center gap-2 mb-3">
             {isIncognito && (
               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border-2 border-secondary bg-secondary/20 text-xs font-black text-secondary uppercase tracking-wide">
-                <EyeOff className="h-3.5 w-3.5" /> Mode Incognito
+                <EyeOff className="h-3.5 w-3.5" /> Mode Fantôme
               </span>
             )}
             {roomCode && <RoomCodeBadge roomCode={roomCode} />}
@@ -54,7 +54,7 @@ export function FinalResultsView({
           </h1>
           {isIncognito ? (
             <p className="text-base sm:text-xl text-accent font-black">
-              🎭 Le Grand Démasquage des Agents !
+              🎭 Mode Fantôme : Les Masques Tombent !
             </p>
           ) : (
             <p className="text-base sm:text-xl text-muted-foreground font-medium">
@@ -70,9 +70,9 @@ export function FinalResultsView({
               {isIncognito && (
                 <div className="mb-3">
                   <span className="inline-block px-3 py-1 rounded-full border-2 border-yellow-400/60 bg-yellow-400/20 text-xs sm:text-sm font-black text-yellow-300 uppercase tracking-wider">
-                    🕵️ {codenames?.[winner.id] || "Agent Mystère"}
+                    👑 L&apos;Inconnu #1 Révélé
                   </span>
-                  <p className="text-xs text-muted-foreground font-medium mt-1">était en réalité...</p>
+                  <p className="text-xs text-muted-foreground font-medium mt-1">qui dominait la partie dans l&apos;ombre était...</p>
                 </div>
               )}
               <Crown className="h-10 w-10 sm:h-12 sm:w-12 text-yellow-400 mx-auto mb-3 animate-bounce" />
@@ -91,7 +91,7 @@ export function FinalResultsView({
         <Card className="w-full max-w-lg border-2 border-border mb-6 sm:mb-10 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-500">
           <CardContent className="p-4 sm:p-6">
             <h3 className="text-center font-black text-xs sm:text-sm text-muted-foreground uppercase tracking-widest mb-3 sm:mb-4">
-              {isIncognito ? "🎭 Démasquage & Classement final" : "Classement final"}
+              {isIncognito ? "🎭 Le Grand Dévoilement Final" : "Classement final"}
             </h3>
             <div className="space-y-2 sm:space-y-2.5">
               {leaderboard.map((player, i) => {
@@ -105,7 +105,6 @@ export function FinalResultsView({
 
                 const rankColor = i === 0 ? "text-yellow-400" : i === 1 ? "text-gray-300" : i === 2 ? "text-orange-400" : "text-primary"
                 const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`
-                const codename = codenames?.[player.id] || "Agent Mystère 🕵️"
 
                 return (
                   <div
@@ -114,27 +113,10 @@ export function FinalResultsView({
                     style={{ animationDelay: `${(i + 3) * 100}ms` }}
                   >
                     <span className={`text-xl sm:text-2xl font-black w-7 sm:w-8 ${rankColor}`}>{medal}</span>
-
-                    {isIncognito ? (
-                      <div className="flex-1 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2.5 min-w-0">
-                        <span className="text-xs sm:text-sm font-black px-2 py-0.5 rounded bg-muted border border-border shrink-0 max-w-fit text-foreground/90">
-                          {codename}
-                        </span>
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <span className="text-muted-foreground text-[11px] font-bold">était</span>
-                          <span className="text-xl sm:text-2xl">{player.avatar}</span>
-                          <p className="font-bold text-sm sm:text-base truncate">{player.pseudo}</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <span className="text-2xl sm:text-3xl">{player.avatar}</span>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-bold text-sm sm:text-lg truncate">{player.pseudo}</p>
-                        </div>
-                      </>
-                    )}
-
+                    <span className="text-2xl sm:text-3xl">{player.avatar}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-sm sm:text-lg truncate">{player.pseudo}</p>
+                    </div>
                     <span className={`text-base sm:text-xl font-black shrink-0 ${rankColor}`}>
                       {player.totalScore} pts
                     </span>

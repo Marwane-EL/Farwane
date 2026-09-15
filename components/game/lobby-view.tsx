@@ -309,12 +309,12 @@ export function LobbyView({
                           onClick={() => onUpdateSettings({ ...settings, gameMode: "incognito" })}
                           className="h-8 sm:h-9 font-black text-[11px] sm:text-xs md:text-sm gap-1 px-1 sm:px-2"
                         >
-                          <span>🕵️</span> Incognito
+                          <span>👻</span> Fantôme
                         </Button>
                       </div>
                       {settings.gameMode === "incognito" && (
-                        <p className="text-[11px] text-primary font-bold animate-in fade-in">
-                          🕵️ Mode Incognito : auteurs masqués, noms de code secrets et démasquage final !
+                        <p className="text-[11px] text-secondary font-bold animate-in fade-in">
+                          👻 Mode Fantôme : classements masqués, suspense total et révélation à la fin !
                         </p>
                       )}
                     </div>
@@ -430,7 +430,7 @@ export function LobbyView({
                         <RefreshCw className="h-3.5 w-3.5 text-accent" /> {settings.maxRefreshes} rerolls
                       </span>
                       <span className="flex items-center gap-1.5 p-2 rounded-md bg-muted/20 border border-border/40">
-                        {settings.gameMode === "niche" ? "🎯 Mode Niches" : settings.gameMode === "incognito" ? "🕵️ Incognito" : "🎭 Classique"}
+                        {settings.gameMode === "niche" ? "🎯 Mode Niches" : settings.gameMode === "incognito" ? "👻 Mode Fantôme" : "🎭 Classique"}
                       </span>
                     </div>
                   </CardContent>
