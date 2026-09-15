@@ -2,11 +2,11 @@
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Trophy, Medal, Award, RotateCcw, Home, Sparkles, Loader2, Star } from "lucide-react"
+import { Trophy, Medal, Award, RotateCcw, Home, Sparkles, Loader2, Star, EyeOff } from "lucide-react"
 import { MemeMedia } from "@/components/game/meme-media"
 import { DownloadMemeButton } from "@/components/game/download-meme-button"
 import { RoomCodeBadge } from "@/components/game/room-code-badge"
-import type { Meme, Player } from "@/types/game"
+import type { Meme, Player, GameMode } from "@/types/game"
 
 interface ResultsViewProps {
   memes: Meme[]
@@ -18,6 +18,9 @@ interface ResultsViewProps {
   onBackToHome: () => void
   isHost: boolean
   roomCode?: string
+  gameMode?: GameMode
+  codenames?: Record<string, string>
+  currentPlayerId?: string
 }
 
 export function ResultsView({
@@ -25,7 +28,11 @@ export function ResultsView({
   currentRound, totalRounds,
   onPlayAgain, onBackToHome, isHost,
   roomCode,
+  gameMode,
+  codenames,
+  currentPlayerId,
 }: ResultsViewProps) {
+  const isIncognito = gameMode === "incognito"
   const sortedMemes = [...memes].sort((a, b) => b.votes - a.votes)
   const topThree = sortedMemes.slice(0, 3)
   const isLastRound = currentRound >= totalRounds
@@ -81,6 +88,11 @@ export function ResultsView({
             <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">
               Manche {currentRound}/{totalRounds}
             </span>
+            {isIncognito && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-secondary/50 bg-secondary/15 text-[11px] font-black text-secondary">
+                <EyeOff className="h-3 w-3" /> Incognito
+              </span>
+            )}
             {roomCode && <RoomCodeBadge roomCode={roomCode} />}
           </div>
           <div className="flex items-center justify-center gap-2 sm:gap-3">
@@ -99,6 +111,10 @@ export function ResultsView({
             const config = podiumConfig[orderIndex]
             if (!meme || !config) return null
             const Icon = config.icon
+            const isCurrentAuthor = isIncognito && meme.playerId === currentPlayerId
+            const authorDisplayName = isIncognito
+              ? `${codenames?.[meme.playerId] || meme.playerPseudo}${isCurrentAuthor ? " (toi)" : ""}`
+              : meme.playerPseudo
             return (
               <div key={meme.id} className="flex flex-col items-center flex-1 animate-in fade-in zoom-in-95 duration-500" style={{ animationDelay: `${(visualIndex + 1) * 200}ms` }}>
                 <div className={`w-full border-2 ${config.borderColor} ${config.bgColor} ${config.shadowColor} rounded-lg mb-2 transition-transform hover:-translate-x-[1px] hover:-translate-y-[1px] relative group`}>
@@ -107,9 +123,9 @@ export function ResultsView({
                       <DownloadMemeButton meme={meme} className="h-7 w-7" />
                     </div>
                     <div className="w-full aspect-square rounded-md overflow-hidden mb-1.5 bg-muted/50 border border-border/30">
-                      <MemeMedia src={meme.imageUrl} alt={`Meme de ${meme.playerPseudo}`} className="w-full h-full object-cover" forceMuted />
+                      <MemeMedia src={meme.imageUrl} alt={`Meme de ${authorDisplayName}`} className="w-full h-full object-cover" forceMuted />
                     </div>
-                    <p className="font-black text-xs sm:text-sm truncate">{meme.playerPseudo}</p>
+                    <p className="font-black text-xs sm:text-sm truncate">{authorDisplayName}</p>
                     <p className={`text-base sm:text-xl font-black ${config.textColor}`}>{meme.votes} pts</p>
                   </div>
                 </div>
@@ -133,19 +149,25 @@ export function ResultsView({
                 Classement général
               </h3>
               <div className="space-y-2">
-                {leaderboard.map((player, i) => (
-                  <div key={player.id} className={`flex items-center gap-2 sm:gap-3 px-3 py-2 rounded-lg border-2 transition-all ${
-                    i === 0 ? "border-yellow-400/60 bg-yellow-400/10 shadow-[2px_2px_0px_oklch(0.85_0.19_95_/_0.4)]" :
-                    i === 1 ? "border-gray-400/40 bg-gray-400/5" :
-                    i === 2 ? "border-orange-400/40 bg-orange-400/5" :
-                    "border-border/40 bg-muted/20"
-                  }`}>
-                    <span className="text-xs sm:text-sm font-black text-muted-foreground w-5">{i + 1}.</span>
-                    <span className="text-base sm:text-lg">{player.avatar}</span>
-                    <span className="font-bold text-sm flex-1 truncate">{player.pseudo}</span>
-                    <span className="font-black text-primary text-sm sm:text-base shrink-0">{player.totalScore} pts</span>
-                  </div>
-                ))}
+                {leaderboard.map((player, i) => {
+                  const isCurrent = player.id === currentPlayerId
+                  const codename = codenames?.[player.id] || "Agent Mystère 🕵️"
+                  const displayName = isIncognito ? (isCurrent ? `${codename} (toi)` : codename) : player.pseudo
+                  const displayAvatar = isIncognito ? "🕵️" : player.avatar
+                  return (
+                    <div key={player.id} className={`flex items-center gap-2 sm:gap-3 px-3 py-2 rounded-lg border-2 transition-all ${
+                      i === 0 ? "border-yellow-400/60 bg-yellow-400/10 shadow-[2px_2px_0px_oklch(0.85_0.19_95_/_0.4)]" :
+                      i === 1 ? "border-gray-400/40 bg-gray-400/5" :
+                      i === 2 ? "border-orange-400/40 bg-orange-400/5" :
+                      "border-border/40 bg-muted/20"
+                    } ${isCurrent && isIncognito ? "ring-2 ring-primary/60" : ""}`}>
+                      <span className="text-xs sm:text-sm font-black text-muted-foreground w-5">{i + 1}.</span>
+                      <span className="text-base sm:text-lg">{displayAvatar}</span>
+                      <span className="font-bold text-sm flex-1 truncate">{displayName}</span>
+                      <span className="font-black text-primary text-sm sm:text-base shrink-0">{player.totalScore} pts</span>
+                    </div>
+                  )
+                })}
               </div>
             </CardContent>
           </Card>

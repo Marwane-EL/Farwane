@@ -1,16 +1,31 @@
 export type GamePhase = "home" | "lobby" | "creation" | "voting" | "results" | "final-results"
 
-export type GameMode = "classic" | "niche"
+export type GameMode = "classic" | "niche" | "incognito"
 
 export interface GameSettings {
   timerDuration: number // seconds for creation phase
   totalRounds: number
   maxPlayers: number
-  gameMode: GameMode // "classic" | "niche"
+  gameMode: GameMode // "classic" | "niche" | "incognito"
   maxRefreshes: number // number of meme rerolls allowed per round
 }
 
 export const getMinNichesRequired = (totalRounds: number) => Math.ceil(totalRounds / 2)
+
+export const SECRET_CODENAMES = [
+  "Agent 007 🕶️",
+  "L'Infiltré 🕵️",
+  "Ninja Masqué 🥷",
+  "Fantôme Malin 👻",
+  "Ombre Rapide 👤",
+  "Maître Mystère 🎭",
+  "Caméléon 🦎",
+  "Taupe Secrète 🦔",
+  "Espion Doré 👑",
+  "Corbeau Furtif 🦅",
+  "Loup Solitaire 🐺",
+  "Spectre Bleu 🔮",
+]
 
 export interface Player {
   id: string
@@ -18,6 +33,7 @@ export interface Player {
   avatar: string
   score: number
   isHost: boolean
+  codename?: string
 }
 
 export interface Meme {

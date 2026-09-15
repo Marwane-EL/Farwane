@@ -34,6 +34,7 @@ export default function MemeGame() {
     setError,
     createLibrary, deleteLibrary, addMemeToLibrary, removeMemeFromLibrary,
     addNicheToPool, removeNicheFromPool, clearNichePool,
+    codenames,
   } = useGameRoom()
 
   const { niches: personalNiches, addNiche: addToPersonalLibrary } = useNicheLibrary()
@@ -127,6 +128,7 @@ export default function MemeGame() {
             onForceAdvance={advanceMeme}
             hasUsedHeart={hasUsedHeart}
             onLeave={() => { resetTetrisScore(); leaveRoom(); }}
+            gameMode={settings.gameMode}
           />
         )}
         {phase === "results" && (
@@ -140,6 +142,9 @@ export default function MemeGame() {
             onPlayAgain={nextRound}
             onBackToHome={leaveRoom}
             isHost={currentPlayer?.isHost || false}
+            gameMode={settings.gameMode}
+            codenames={codenames}
+            currentPlayerId={currentPlayer?.id || ""}
           />
         )}
         {phase === "final-results" && (
@@ -150,6 +155,8 @@ export default function MemeGame() {
             onNewGame={() => { resetTetrisScore(); newGame(); }}
             onBackToHome={() => { resetTetrisScore(); leaveRoom(); }}
             isHost={currentPlayer?.isHost || false}
+            gameMode={settings.gameMode}
+            codenames={codenames}
           />
         )}
       </div>

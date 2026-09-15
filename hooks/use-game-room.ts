@@ -4,6 +4,7 @@ import { useState, useRef, useCallback, useEffect } from "react"
 import { supabase } from "@/lib/supabase"
 import type { RealtimeChannel } from "@supabase/supabase-js"
 import type { Player, Meme, MemePack, MemeLibrary, GamePhase, GameSettings, NichePoolItem } from "@/types/game"
+import { SECRET_CODENAMES } from "@/types/game"
 import { getCachedPacks } from "@/lib/packs-cache"
 import { getApiBase } from "@/lib/utils"
 
@@ -36,47 +37,36 @@ function assignRandomMemes(
   allMemes: string[],
   usedUrls: Set<string>
 ): Record<string, string> {
-  let available = allMemes.filter((url) => !usedUrls.has(url))
-  // Reset if not enough available
-  if (available.length < playerIds.length) {
-    usedUrls.clear()
-    available = [...allMemes]
-  }
-  // Shuffle (Fisher-Yates)
-  const shuffled = [...available]
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
-  }
   const assignments: Record<string, string> = {}
+  const available = allMemes.filter((url) => !usedUrls.has(url))
+  const pool = available.length >= playerIds.length ? available : allMemes
+  const shuffled = [...pool].sort(() => Math.random() - 0.5)
+
   playerIds.forEach((id, i) => {
-    assignments[id] = shuffled[i % shuffled.length]
-    usedUrls.add(shuffled[i % shuffled.length])
+    const memeUrl = shuffled[i % shuffled.length]
+    assignments[id] = memeUrl
+    usedUrls.add(memeUrl)
   })
+
   return assignments
 }
 
-// Pick a niche according to game mode and max 2 occurrences rule
+// Draw a random niche, avoiding recently used niches
 function drawNiche(
-  pool: import("@/types/game").NichePoolItem[],
+  nichePool: NichePoolItem[],
   usedCounts: Record<string, number>,
-  gameMode: import("@/types/game").GameMode
-): import("@/types/game").NichePoolItem | null {
-  if (gameMode !== "niche" || pool.length === 0) return null
+  gameMode: GameSettings["gameMode"]
+): NichePoolItem | null {
+  if (gameMode !== "niche") return null
+  if (nichePool.length === 0) return null
 
-  // A niche can appear at most 2 times in the entire game
-  const available = pool.filter((n) => (usedCounts[n.id] || 0) < 2)
+  const available = nichePool.filter((n) => (usedCounts[n.id] || 0) < 2)
   if (available.length === 0) {
-    // If somehow all reached 2, fallback to least used
-    const minUsage = Math.min(...pool.map((n) => usedCounts[n.id] || 0))
-    const candidates = pool.filter((n) => (usedCounts[n.id] || 0) === minUsage)
-    const picked = candidates[Math.floor(Math.random() * candidates.length)]
-    usedCounts[picked.id] = (usedCounts[picked.id] || 0) + 1
-    return picked
+    Object.keys(usedCounts).forEach((k) => delete usedCounts[k])
+    return nichePool[Math.floor(Math.random() * nichePool.length)]
   }
 
-  // Prioritize niches with the fewest uses (e.g. 0 uses before 1 use)
-  const minUsage = Math.min(...available.map((n) => usedCounts[n.id] || 0))
+  const minUsage = Math.min(...available.map((n) => (usedCounts[n.id] || 0)))
   const candidates = available.filter((n) => (usedCounts[n.id] || 0) === minUsage)
   const picked = candidates[Math.floor(Math.random() * candidates.length)]
   usedCounts[picked.id] = (usedCounts[picked.id] || 0) + 1
@@ -102,6 +92,7 @@ interface StoredSession {
   currentNiche: NichePoolItem | null
   roundStartedAt?: number
   assignments?: Record<string, string>
+  codenames?: Record<string, string>
 }
 
 export function useGameRoom() {
@@ -140,6 +131,9 @@ export function useGameRoom() {
   const [hasSubmitted, setHasSubmitted] = useState(false)
   const [refreshesLeft, setRefreshesLeft] = useState(DEFAULT_SETTINGS.maxRefreshes)
   const [hasUsedHeart, setHasUsedHeart] = useState(false)
+  const [codenames, setCodenames] = useState<Record<string, string>>({})
+  const codenamesRef = useRef<Record<string, string>>(codenames)
+  useEffect(() => { codenamesRef.current = codenames }, [codenames])
 
   // Synced voting state
   const [hasVotedOnCurrent, setHasVotedOnCurrent] = useState(false)
@@ -217,6 +211,10 @@ export function useGameRoom() {
                 if (saved.currentNiche) setCurrentNiche(saved.currentNiche)
                 if (saved.roundStartedAt) setRoundStartedAt(saved.roundStartedAt)
                 if (saved.assignments) currentAssignmentsRef.current = saved.assignments
+                if (saved.codenames) {
+                  setCodenames(saved.codenames)
+                  codenamesRef.current = saved.codenames
+                }
 
                 subscribeToRoom(saved.roomCode, restoredPlayer, true)
               } else {
@@ -255,6 +253,7 @@ export function useGameRoom() {
       currentNiche,
       roundStartedAt,
       assignments: currentAssignmentsRef.current,
+      codenames,
     }
     try {
       sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionData))
@@ -265,7 +264,7 @@ export function useGameRoom() {
     roomCode, currentPlayer, phase, currentRound,
     playerScores, submissions, currentMemeIndex,
     myMemeUrl, hasSubmitted, refreshesLeft,
-    hasUsedHeart, settings, selectedPack, currentNiche, roundStartedAt
+    hasUsedHeart, settings, selectedPack, currentNiche, roundStartedAt, codenames
   ])
 
   // Sync room code to URL (?room=CODE) and clear when leaving
@@ -438,6 +437,11 @@ export function useGameRoom() {
         setRoundStartedAt(payload.roundStartedAt)
         roundStartedAtRef.current = payload.roundStartedAt
       }
+      if (payload.codenames) {
+        setCodenames(payload.codenames)
+        codenamesRef.current = payload.codenames
+        setPlayers((prev) => prev.map((p) => ({ ...p, codename: payload.codenames[p.id] })))
+      }
     })
 
     // Meme submitted
@@ -554,6 +558,7 @@ export function useGameRoom() {
           nichePool: nichePoolRef.current,
           roundStartedAt: roundStartedAtRef.current,
           assignments: currentAssignmentsRef.current,
+          codenames: codenamesRef.current,
         },
       })
     })
@@ -704,6 +709,18 @@ export function useGameRoom() {
     const assignments = assignRandomMemes(playerIds, selectedPack.memes, usedMemeUrlsRef.current)
     currentAssignmentsRef.current = assignments
 
+    // Generate secret codenames if incognito mode
+    const generatedCodenames: Record<string, string> = {}
+    if (settings.gameMode === "incognito") {
+      const shuffled = [...SECRET_CODENAMES].sort(() => Math.random() - 0.5)
+      players.forEach((p, idx) => {
+        generatedCodenames[p.id] = shuffled[idx % shuffled.length]
+      })
+      setCodenames(generatedCodenames)
+      codenamesRef.current = generatedCodenames
+      setPlayers((prev) => prev.map((p) => ({ ...p, codename: generatedCodenames[p.id] })))
+    }
+
     // Draw niche for round 1
     const niche = drawNiche(nichePool, usedNicheCountRef.current, settings.gameMode)
     const now = Date.now()
@@ -721,22 +738,26 @@ export function useGameRoom() {
     setHasUsedHeart(false)
     channelRef.current.send({
       type: "broadcast", event: "game:start",
-      payload: { pack: selectedPack, assignments, settings, niche, roundStartedAt: now },
+      payload: { pack: selectedPack, assignments, settings, niche, roundStartedAt: now, codenames: generatedCodenames },
     })
   }, [currentPlayer, selectedPack, roomCode, settings, players, nichePool])
 
   const submitMeme = useCallback((caption: string) => {
     if (!channelRef.current || !currentPlayer || hasSubmitted) return
+    const pseudo = settings.gameMode === "incognito"
+      ? (codenamesRef.current[currentPlayer.id] || codenames[currentPlayer.id] || "Auteur Secret 🕵️")
+      : currentPlayer.pseudo
+
     const meme: Meme = {
       id: crypto.randomUUID(), playerId: currentPlayer.id,
-      playerPseudo: currentPlayer.pseudo,
+      playerPseudo: pseudo,
       imageUrl: myMemeUrl,
       caption, votes: 0,
     }
     setHasSubmitted(true)
     setSubmissions((prev) => [...prev, meme])
     channelRef.current.send({ type: "broadcast", event: "game:submit", payload: { meme } })
-  }, [currentPlayer, myMemeUrl, hasSubmitted])
+  }, [currentPlayer, myMemeUrl, hasSubmitted, settings.gameMode, codenames])
 
   const moveToVoting = useCallback(() => {
     if (!currentPlayer?.isHost || !channelRef.current) return
@@ -751,18 +772,28 @@ export function useGameRoom() {
     if (!channelRef.current || !currentPlayer || hasVotedOnCurrent) return
     if (isHeart && hasUsedHeart) return // Security check
 
-    const finalScore = isHeart ? score + 10 : score
+    const currentMeme = submissions[currentMemeIndex]
+    const isAuthor = currentMeme?.playerId === currentPlayer.id
+
+    // In incognito mode, author vote is registered so everyone appears identical,
+    // but the author's vote adds 0 points to their own meme!
+    const effectiveScore = (settings.gameMode === "incognito" && isAuthor) ? 0 : score
+    const finalScore = isHeart ? (effectiveScore > 0 ? effectiveScore + 10 : 0) : effectiveScore
     
     setHasVotedOnCurrent(true)
-    if (isHeart) setHasUsedHeart(true)
+    if (isHeart && !(settings.gameMode === "incognito" && isAuthor)) {
+      setHasUsedHeart(true)
+    }
     
     setCurrentVoters((prev) => prev.includes(currentPlayer.id) ? prev : [...prev, currentPlayer.id])
-    setSubmissions((prev) => prev.map((m) => (m.id === memeId ? { ...m, votes: m.votes + finalScore } : m)))
+    if (finalScore > 0) {
+      setSubmissions((prev) => prev.map((m) => (m.id === memeId ? { ...m, votes: m.votes + finalScore } : m)))
+    }
     channelRef.current.send({
       type: "broadcast", event: "game:vote",
       payload: { memeId, score: finalScore, voterId: currentPlayer.id },
     })
-  }, [currentPlayer, hasVotedOnCurrent, hasUsedHeart])
+  }, [currentPlayer, hasVotedOnCurrent, hasUsedHeart, submissions, currentMemeIndex, settings.gameMode])
 
   // Host: advance to next meme (used by auto-advance and force-advance)
   const advanceMeme = useCallback(() => {
@@ -798,12 +829,14 @@ export function useGameRoom() {
     if (phase !== "voting" || !currentPlayer?.isHost) return
     const currentMeme = submissions[currentMemeIndex]
     if (!currentMeme) return
-    const eligibleVoters = players.filter((p) => p.id !== currentMeme.playerId).length
+    const eligibleVoters = settings.gameMode === "incognito"
+      ? players.length
+      : players.filter((p) => p.id !== currentMeme.playerId).length
     if (eligibleVoters > 0 && currentVoters.length >= eligibleVoters) {
       const timer = setTimeout(() => advanceMeme(), 1000)
       return () => clearTimeout(timer)
     }
-  }, [phase, currentPlayer, submissions, currentMemeIndex, currentVoters, players, advanceMeme])
+  }, [phase, currentPlayer, submissions, currentMemeIndex, currentVoters, players, advanceMeme, settings.gameMode])
 
   // Host auto-advance: when all players have submitted their memes
   useEffect(() => {
@@ -860,6 +893,8 @@ export function useGameRoom() {
     if (!currentPlayer?.isHost || !channelRef.current) return
     setPhase("lobby")
     setCurrentRound(1)
+    setCodenames({})
+    codenamesRef.current = {}
     setPlayerScores({})
     setSubmissions([])
     setSelectedPack(null)
@@ -1002,5 +1037,6 @@ export function useGameRoom() {
     setError,
     createLibrary, deleteLibrary, addMemeToLibrary, removeMemeFromLibrary,
     addNicheToPool, removeNicheFromPool, clearNichePool,
+    codenames,
   }
 }

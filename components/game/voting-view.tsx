@@ -8,7 +8,7 @@ import { MemeMedia } from "@/components/game/meme-media"
 import { DownloadMemeButton } from "@/components/game/download-meme-button"
 import { LeaveGameButton } from "@/components/game/leave-game-button"
 import { RoomCodeBadge } from "@/components/game/room-code-badge"
-import type { Meme } from "@/types/game"
+import type { Meme, GameMode } from "@/types/game"
 
 interface VotingViewProps {
   meme: Meme
@@ -24,6 +24,7 @@ interface VotingViewProps {
   hasUsedHeart: boolean
   onLeave?: () => void
   roomCode?: string
+  gameMode?: GameMode
 }
 
 export function VotingView({
@@ -40,11 +41,14 @@ export function VotingView({
   hasUsedHeart,
   onLeave,
   roomCode,
+  gameMode,
 }: VotingViewProps) {
   const [timeLeft, setTimeLeft] = useState(20)
   const [selectedVote, setSelectedVote] = useState<string | null>(null)
+  const isIncognito = gameMode === "incognito"
   const isOwnMeme = meme.playerId === currentPlayerId
-  const eligibleVoters = totalPlayers - 1
+  const showOwnMemeScreen = isOwnMeme && !isIncognito
+  const eligibleVoters = isIncognito ? totalPlayers : Math.max(1, totalPlayers - 1)
 
   // Reset state when meme changes
   useEffect(() => {
@@ -54,15 +58,15 @@ export function VotingView({
 
   // Visual timer
   useEffect(() => {
-    if (isOwnMeme) return
+    if (showOwnMemeScreen) return
     const timer = setInterval(() => {
       setTimeLeft((prev) => (prev <= 0 ? 0 : prev - 1))
     }, 1000)
     return () => clearInterval(timer)
-  }, [currentIndex, isOwnMeme])
+  }, [currentIndex, showOwnMemeScreen])
 
   const handleVote = (vote: string, isHeart: boolean = false) => {
-    if (hasVotedOnCurrent || isOwnMeme) return
+    if (hasVotedOnCurrent || showOwnMemeScreen) return
     const scoreMap: Record<string, number> = {
       bide: 0,
       bof: 1,
@@ -151,7 +155,7 @@ export function VotingView({
 
             {/* Anonymous indicator */}
             <p className="text-xs text-muted-foreground shrink-0 font-medium">
-              Créé par un joueur anonyme 🎭
+              {isIncognito ? "Créé par un agent incognito 🕵️" : "Créé par un joueur anonyme 🎭"}
             </p>
           </div>
         </CardContent>
@@ -159,7 +163,7 @@ export function VotingView({
 
       {/* Vote buttons or waiting state */}
       <div className="w-full max-w-4xl shrink-0">
-        {isOwnMeme ? (
+        {showOwnMemeScreen ? (
           <div className="text-center animate-in fade-in duration-300 py-1">
             <p className="text-base sm:text-xl font-black text-secondary mb-1">C&apos;est ta légende ! 😏</p>
             <p className="text-xs sm:text-sm text-muted-foreground mb-2 font-medium">Les autres joueurs sont en train de voter...</p>
@@ -208,7 +212,7 @@ export function VotingView({
                     <button
                       key={option.id}
                       onClick={() => handleVote(option.id)}
-                      disabled={hasVotedOnCurrent || isOwnMeme}
+                      disabled={hasVotedOnCurrent || showOwnMemeScreen}
                       className={`
                         sm:flex-1 sm:min-w-[120px] sm:max-w-[180px] h-auto py-1.5 px-1 sm:py-2.5 sm:px-3
                         flex flex-col items-center justify-center gap-0.5
@@ -229,7 +233,7 @@ export function VotingView({
                 {/* Heart vote — mobile */}
                 <button
                   onClick={() => handleVote("heart", true)}
-                  disabled={hasVotedOnCurrent || isOwnMeme || hasUsedHeart}
+                  disabled={hasVotedOnCurrent || showOwnMemeScreen || hasUsedHeart}
                   className={`
                     sm:hidden h-auto py-1.5 px-1 flex flex-col items-center justify-center gap-0.5
                     border-2 rounded-lg font-bold transition-all duration-150 select-none
@@ -254,7 +258,7 @@ export function VotingView({
                 </div>
                 <button
                   onClick={() => handleVote("heart", true)}
-                  disabled={hasVotedOnCurrent || isOwnMeme || hasUsedHeart}
+                  disabled={hasVotedOnCurrent || showOwnMemeScreen || hasUsedHeart}
                   className={`
                     h-12 sm:h-14 px-6 sm:px-10 text-sm sm:text-lg font-black border-2 rounded-lg
                     transition-all duration-150 select-none

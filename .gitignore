@@ -17,3 +17,4 @@ memes_h265/
 audit-report.json
 android/
 capacitor.config.ts
+*.tsbuildinfo

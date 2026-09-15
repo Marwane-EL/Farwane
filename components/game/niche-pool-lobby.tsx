@@ -6,13 +6,13 @@ import { Button } from "@/components/ui/button"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel
 } from "@/components/ui/dropdown-menu"
-import type { NichePoolItem, NicheItem } from "@/types/game"
+import type { NichePoolItem, NicheItem, GameMode } from "@/types/game"
 
 interface NichePoolLobbyProps {
   nichePool: NichePoolItem[]
   currentPlayerId: string
   isHost: boolean
-  gameMode: "classic" | "niche"
+  gameMode: GameMode
   minRequiredNiches: number
   personalNiches: NicheItem[]         // from useNicheLibrary
   onAdd: (text: string, saveToLibrary: boolean) => void
