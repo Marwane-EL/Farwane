@@ -30,3 +30,13 @@ export async function normalizeMemeUrls(urls: string[]): Promise<string[]> {
   )
   return normalizedUrls
 }
+
+export function getApiBase(): string {
+  if (typeof window === "undefined") return process.env.NEXT_PUBLIC_API_URL ?? ""
+  // If running in Capacitor (mobile native app)
+  if (window.location.protocol === "capacitor:" || window.location.protocol === "file:") {
+    return process.env.NEXT_PUBLIC_API_URL ?? ""
+  }
+  // On web (localhost or deployed web app), use relative path to prevent CORS errors
+  return ""
+}

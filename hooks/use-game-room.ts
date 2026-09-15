@@ -4,7 +4,8 @@ import { useState, useRef, useCallback, useEffect } from "react"
 import { supabase } from "@/lib/supabase"
 import type { RealtimeChannel } from "@supabase/supabase-js"
 import type { Player, Meme, MemePack, MemeLibrary, GamePhase, GameSettings, NichePoolItem } from "@/types/game"
-
+import { getCachedPacks } from "@/lib/packs-cache"
+import { getApiBase } from "@/lib/utils"
 
 const avatars = ["🎮", "🔥", "👑", "💀", "🚀", "🎲", "🎯", "⚡", "🌟", "🎪", "🦄", "🐉"]
 
@@ -82,20 +83,32 @@ function drawNiche(
   return picked
 }
 
+const SESSION_STORAGE_KEY = "farwane_active_session_v1"
+
+interface StoredSession {
+  roomCode: string
+  player: Player
+  phase: GamePhase
+  currentRound: number
+  playerScores: Record<string, number>
+  submissions: Meme[]
+  currentMemeIndex: number
+  myMemeUrl: string
+  hasSubmitted: boolean
+  refreshesLeft: number
+  hasUsedHeart: boolean
+  settings: GameSettings
+  selectedPack: MemePack | null
+  currentNiche: NichePoolItem | null
+  roundStartedAt?: number
+  assignments?: Record<string, string>
+}
+
 export function useGameRoom() {
   const channelRef = useRef<RealtimeChannel | null>(null)
   const playerIdRef = useRef<string>("")
   const usedMemeUrlsRef = useRef<Set<string>>(new Set())
   const usedNicheCountRef = useRef<Record<string, number>>({})
-
-  useEffect(() => {
-    let id = sessionStorage.getItem("player_id")
-    if (!id) {
-      id = crypto.randomUUID()
-      sessionStorage.setItem("player_id", id)
-    }
-    playerIdRef.current = id
-  }, [])
 
   // Core state
   const [phase, setPhase] = useState<GamePhase>("home")
@@ -109,6 +122,7 @@ export function useGameRoom() {
   const [settings, setSettings] = useState<GameSettings>(DEFAULT_SETTINGS)
   const [currentRound, setCurrentRound] = useState(1)
   const [playerScores, setPlayerScores] = useState<Record<string, number>>({})
+  const [roundStartedAt, setRoundStartedAt] = useState<number | undefined>(undefined)
 
   // Niche state
   const [nichePool, setNichePool] = useState<NichePoolItem[]>([])
@@ -117,81 +131,6 @@ export function useGameRoom() {
   // Meme packs from Supabase
   const [memePacks, setMemePacks] = useState<MemePack[]>([])
   const [packsLoading, setPacksLoading] = useState(true)
-
-  useEffect(() => {
-    async function fetchMemePacks() {
-      try {
-        const { data, error: fetchErr } = await supabase
-          .from("meme_packs")
-          .select("*")
-          .order("created_at", { ascending: true })
-        if (!fetchErr && data) {
-          const packs: MemePack[] = data.map((row) => ({
-            id: row.id,
-            name: row.name,
-            memes: (row.memes as string[]) || [],
-            isDefault: row.is_default,
-          }))
-
-          // Resolve Tenor page URLs → direct media URLs (with cache)
-          const allUrls = packs.flatMap((p) => p.memes)
-          const cache: Record<string, string> = JSON.parse(
-            localStorage.getItem("tenor_url_cache") || "{}"
-          )
-          const urlsToResolve = allUrls.filter(
-            (url) => url.includes("tenor.com/view/") && !cache[url]
-          )
-
-          if (urlsToResolve.length > 0) {
-            try {
-              const res = await fetch("/api/resolve-urls", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ urls: urlsToResolve }),
-              })
-              const { resolved } = await res.json()
-              urlsToResolve.forEach((url, i) => {
-                if (resolved[i] && resolved[i] !== url) {
-                  cache[url] = resolved[i]
-                }
-              })
-              localStorage.setItem("tenor_url_cache", JSON.stringify(cache))
-            } catch {
-              console.error("Failed to resolve Tenor URLs")
-            }
-          }
-
-          // Apply cache: replace Tenor page URLs with resolved media URLs
-          for (const pack of packs) {
-            pack.memes = pack.memes.map((url) => cache[url] || url)
-          }
-
-          setMemePacks(packs)
-
-          // Auto-select the pack (or user library) with the most memes
-          // This runs after packs load; libraries are loaded separately
-          const currentLibraries: MemeLibrary[] = JSON.parse(
-            localStorage.getItem("meme_libraries") || "[]"
-          )
-          const allOptions: MemePack[] = [
-            ...packs,
-            ...currentLibraries
-              .filter((lib) => lib.memes.length >= 3)
-              .map((lib) => ({ id: lib.id, name: lib.name, memes: lib.memes, isDefault: false })),
-          ]
-          if (allOptions.length > 0) {
-            const best = allOptions.reduce((a, b) => (b.memes.length > a.memes.length ? b : a))
-            setSelectedPack(best)
-          }
-        }
-      } catch {
-        console.error("Failed to fetch meme packs")
-      } finally {
-        setPacksLoading(false)
-      }
-    }
-    fetchMemePacks()
-  }, [])
 
   // Game state
   const [selectedPack, setSelectedPack] = useState<MemePack | null>(null)
@@ -209,6 +148,226 @@ export function useGameRoom() {
   // Libraries (persisted in localStorage)
   const [libraries, setLibraries] = useState<MemeLibrary[]>([])
 
+  // Up-to-date refs to prevent stale closure bugs during real-time sync
+  const phaseRef = useRef<GamePhase>(phase)
+  const settingsRef = useRef<GameSettings>(settings)
+  const selectedPackRef = useRef<MemePack | null>(selectedPack)
+  const currentRoundRef = useRef<number>(currentRound)
+  const playerScoresRef = useRef<Record<string, number>>(playerScores)
+  const submissionsRef = useRef<Meme[]>(submissions)
+  const currentMemeIndexRef = useRef<number>(currentMemeIndex)
+  const currentNicheRef = useRef<NichePoolItem | null>(currentNiche)
+  const nichePoolRef = useRef<NichePoolItem[]>(nichePool)
+  const roundStartedAtRef = useRef<number | undefined>(roundStartedAt)
+  const currentAssignmentsRef = useRef<Record<string, string>>({})
+  const currentPlayerRef = useRef<Player | null>(currentPlayer)
+
+  useEffect(() => { phaseRef.current = phase }, [phase])
+  useEffect(() => { settingsRef.current = settings }, [settings])
+  useEffect(() => { selectedPackRef.current = selectedPack }, [selectedPack])
+  useEffect(() => { currentRoundRef.current = currentRound }, [currentRound])
+  useEffect(() => { playerScoresRef.current = playerScores }, [playerScores])
+  useEffect(() => { submissionsRef.current = submissions }, [submissions])
+  useEffect(() => { currentMemeIndexRef.current = currentMemeIndex }, [currentMemeIndex])
+  useEffect(() => { currentNicheRef.current = currentNiche }, [currentNiche])
+  useEffect(() => { nichePoolRef.current = nichePool }, [nichePool])
+  useEffect(() => { roundStartedAtRef.current = roundStartedAt }, [roundStartedAt])
+  useEffect(() => { currentPlayerRef.current = currentPlayer }, [currentPlayer])
+
+  // Initial load: setup persistent player id & auto-reconnect if session exists
+  useEffect(() => {
+    let id = sessionStorage.getItem("player_id")
+    if (!id) {
+      id = crypto.randomUUID()
+      sessionStorage.setItem("player_id", id)
+    }
+    playerIdRef.current = id
+
+    // Auto-reconnect if session exists
+    const rawSession = sessionStorage.getItem(SESSION_STORAGE_KEY)
+    if (rawSession) {
+      try {
+        const saved = JSON.parse(rawSession) as StoredSession
+        if (saved && saved.roomCode && saved.player) {
+          supabase
+            .from("rooms")
+            .select("code, status, host_id")
+            .eq("code", saved.roomCode)
+            .single()
+            .then(({ data: roomData, error: roomError }) => {
+              if (!roomError && roomData && roomData.status !== "closed") {
+                const isHost = roomData.host_id === saved.player.id
+                const restoredPlayer: Player = {
+                  ...saved.player,
+                  isHost,
+                }
+                setRoomCode(saved.roomCode)
+                setCurrentPlayer(restoredPlayer)
+                setPhase(saved.phase)
+                setCurrentRound(saved.currentRound || 1)
+                setPlayerScores(saved.playerScores || {})
+                setSubmissions(saved.submissions || [])
+                setCurrentMemeIndex(saved.currentMemeIndex || 0)
+                setMyMemeUrl(saved.myMemeUrl || "")
+                setHasSubmitted(saved.hasSubmitted || false)
+                setRefreshesLeft(saved.refreshesLeft ?? DEFAULT_SETTINGS.maxRefreshes)
+                setHasUsedHeart(saved.hasUsedHeart || false)
+                if (saved.settings) setSettings(saved.settings)
+                if (saved.selectedPack) setSelectedPack(saved.selectedPack)
+                if (saved.currentNiche) setCurrentNiche(saved.currentNiche)
+                if (saved.roundStartedAt) setRoundStartedAt(saved.roundStartedAt)
+                if (saved.assignments) currentAssignmentsRef.current = saved.assignments
+
+                subscribeToRoom(saved.roomCode, restoredPlayer, true)
+              } else {
+                sessionStorage.removeItem(SESSION_STORAGE_KEY)
+              }
+            })
+        }
+      } catch {
+        sessionStorage.removeItem(SESSION_STORAGE_KEY)
+      }
+    }
+  }, [])
+
+  // Persist session to sessionStorage whenever meaningful state changes
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    if (!roomCode || !currentPlayer || phase === "home") {
+      sessionStorage.removeItem(SESSION_STORAGE_KEY)
+      return
+    }
+
+    const sessionData: StoredSession = {
+      roomCode,
+      player: currentPlayer,
+      phase,
+      currentRound,
+      playerScores,
+      submissions,
+      currentMemeIndex,
+      myMemeUrl,
+      hasSubmitted,
+      refreshesLeft,
+      hasUsedHeart,
+      settings,
+      selectedPack,
+      currentNiche,
+      roundStartedAt,
+      assignments: currentAssignmentsRef.current,
+    }
+    try {
+      sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionData))
+    } catch {
+      // storage quota or private browsing
+    }
+  }, [
+    roomCode, currentPlayer, phase, currentRound,
+    playerScores, submissions, currentMemeIndex,
+    myMemeUrl, hasSubmitted, refreshesLeft,
+    hasUsedHeart, settings, selectedPack, currentNiche, roundStartedAt
+  ])
+
+  // Sync room code to URL (?room=CODE) and clear when leaving
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    if (roomCode && phase !== "home") {
+      const currentUrl = new URL(window.location.href)
+      if (currentUrl.searchParams.get("room") !== roomCode) {
+        currentUrl.searchParams.set("room", roomCode)
+        window.history.replaceState(null, "", currentUrl.toString())
+      }
+    } else if (phase === "home") {
+      const currentUrl = new URL(window.location.href)
+      if (currentUrl.searchParams.has("room")) {
+        currentUrl.searchParams.delete("room")
+        window.history.replaceState(null, "", currentUrl.pathname + (currentUrl.search ? currentUrl.search : ""))
+      }
+    }
+  }, [roomCode, phase])
+
+  useEffect(() => {
+    async function fetchMemePacks() {
+      const TENOR_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
+
+      try {
+        const packs = await getCachedPacks(async () => {
+          const { data, error: fetchErr } = await supabase
+            .from("meme_packs")
+            .select("id, name, memes, is_default")
+            .order("created_at", { ascending: true })
+          if (fetchErr || !data) throw fetchErr ?? new Error("No data")
+          return data.map((row) => ({
+            id: row.id,
+            name: row.name,
+            memes: (row.memes as string[]) || [],
+            isDefault: row.is_default,
+          }))
+        })
+
+        const allUrls = packs.flatMap((p) => p.memes)
+        const now = Date.now()
+
+        type TenorCacheEntry = { resolved: string; cachedAt: number }
+        const rawCache = JSON.parse(localStorage.getItem("tenor_url_cache_v2") || "{}")
+        const tenorCache: Record<string, TenorCacheEntry> = rawCache
+
+        const urlsToResolve = allUrls.filter((url) => {
+          if (!url.includes("tenor.com/view/")) return false
+          const entry = tenorCache[url]
+          if (!entry) return true
+          return now - entry.cachedAt > TENOR_CACHE_TTL_MS
+        })
+
+        if (urlsToResolve.length > 0) {
+          try {
+            const apiBase = getApiBase()
+            const res = await fetch(`${apiBase}/api/resolve-urls`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ urls: urlsToResolve }),
+            })
+            const { resolved } = await res.json()
+            urlsToResolve.forEach((url, i) => {
+              if (resolved[i] && resolved[i] !== url) {
+                tenorCache[url] = { resolved: resolved[i], cachedAt: now }
+              }
+            })
+            localStorage.setItem("tenor_url_cache_v2", JSON.stringify(tenorCache))
+          } catch {
+            console.error("Failed to resolve Tenor URLs")
+          }
+        }
+
+        const resolvedPacks = packs.map((pack) => ({
+          ...pack,
+          memes: pack.memes.map((url) => tenorCache[url]?.resolved || url),
+        }))
+
+        setMemePacks(resolvedPacks)
+
+        const currentLibraries: MemeLibrary[] = JSON.parse(
+          localStorage.getItem("meme_libraries") || "[]"
+        )
+        const allOptions: MemePack[] = [
+          ...resolvedPacks,
+          ...currentLibraries
+            .filter((lib) => lib.memes.length >= 3)
+            .map((lib) => ({ id: lib.id, name: lib.name, memes: lib.memes, isDefault: false })),
+        ]
+        if (allOptions.length > 0) {
+          const best = allOptions.reduce((a, b) => (b.memes.length > a.memes.length ? b : a))
+          setSelectedPack(best)
+        }
+      } catch {
+        console.error("Failed to fetch meme packs")
+      } finally {
+        setPacksLoading(false)
+      }
+    }
+    fetchMemePacks()
+  }, [])
+
   useEffect(() => {
     const saved = localStorage.getItem("meme_libraries")
     if (saved) {
@@ -221,7 +380,7 @@ export function useGameRoom() {
   }, [libraries])
 
   // Subscribe to room channel
-  const subscribeToRoom = useCallback((code: string, player: Player) => {
+  const subscribeToRoom = useCallback((code: string, player: Player, isReconnect = false, isLateJoin = false) => {
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current)
     }
@@ -253,12 +412,12 @@ export function useGameRoom() {
       setSelectedPack(payload.pack)
     })
 
-    // Niche pool sync (any player can trigger, host broadcasts after every add/remove)
+    // Niche pool sync
     channel.on("broadcast", { event: "niche:pool-sync" }, ({ payload }) => {
       setNichePool(payload.pool)
     })
 
-    // Niche drawn for this round (host broadcasts at start of each round)
+    // Niche drawn for this round
     channel.on("broadcast", { event: "niche:round" }, ({ payload }) => {
       setCurrentNiche(payload.niche ?? null)
     })
@@ -275,6 +434,10 @@ export function useGameRoom() {
       setHasSubmitted(false)
       setRefreshesLeft(payload.settings?.maxRefreshes ?? DEFAULT_SETTINGS.maxRefreshes)
       setCurrentNiche(payload.niche ?? null)
+      if (payload.roundStartedAt) {
+        setRoundStartedAt(payload.roundStartedAt)
+        roundStartedAtRef.current = payload.roundStartedAt
+      }
     })
 
     // Meme submitted
@@ -327,6 +490,10 @@ export function useGameRoom() {
       setRefreshesLeft(payload.settings?.maxRefreshes ?? settings.maxRefreshes ?? DEFAULT_SETTINGS.maxRefreshes)
       setCurrentMemeIndex(0)
       setCurrentNiche(payload.niche ?? null)
+      if (payload.roundStartedAt) {
+        setRoundStartedAt(payload.roundStartedAt)
+        roundStartedAtRef.current = payload.roundStartedAt
+      }
     })
 
     // Final results
@@ -347,12 +514,93 @@ export function useGameRoom() {
       setMyMemeUrl("")
       setHasUsedHeart(false)
       setCurrentNiche(null)
-      // Note: nichePool is intentionally kept for the new game
+      setRoundStartedAt(undefined)
+      currentAssignmentsRef.current = {}
+    })
+
+    // ─── Late Joiner & Reconnection State Sync ─────────────────────────────────
+    // Host listens for sync requests from reconnecting or late-joining players
+    channel.on("broadcast", { event: "game:request-sync" }, ({ payload }) => {
+      if (!currentPlayerRef.current?.isHost || !channelRef.current) return
+      const joiningPlayer = payload?.player as Player | undefined
+      if (!joiningPlayer) return
+
+      // If in creation phase and this player does not have a meme, assign one!
+      if (phaseRef.current === "creation" && selectedPackRef.current) {
+        if (!currentAssignmentsRef.current[joiningPlayer.id]) {
+          const available = selectedPackRef.current.memes.filter(
+            (u) => !usedMemeUrlsRef.current.has(u)
+          )
+          const pool = available.length > 0 ? available : selectedPackRef.current.memes
+          const assigned = pool[Math.floor(Math.random() * pool.length)]
+          usedMemeUrlsRef.current.add(assigned)
+          currentAssignmentsRef.current[joiningPlayer.id] = assigned
+        }
+      }
+
+      channelRef.current.send({
+        type: "broadcast",
+        event: "game:sync-state",
+        payload: {
+          targetPlayerId: joiningPlayer.id,
+          phase: phaseRef.current,
+          settings: settingsRef.current,
+          selectedPack: selectedPackRef.current,
+          currentRound: currentRoundRef.current,
+          playerScores: playerScoresRef.current,
+          submissions: submissionsRef.current,
+          currentMemeIndex: currentMemeIndexRef.current,
+          currentNiche: currentNicheRef.current,
+          nichePool: nichePoolRef.current,
+          roundStartedAt: roundStartedAtRef.current,
+          assignments: currentAssignmentsRef.current,
+        },
+      })
+    })
+
+    // Player receives authoritative state snapshot
+    channel.on("broadcast", { event: "game:sync-state" }, ({ payload }) => {
+      if (payload?.targetPlayerId && payload.targetPlayerId !== playerIdRef.current) return
+
+      if (payload.phase) setPhase(payload.phase)
+      if (payload.settings) setSettings(payload.settings)
+      if (payload.selectedPack) setSelectedPack(payload.selectedPack)
+      if (typeof payload.currentRound === "number") setCurrentRound(payload.currentRound)
+      if (payload.playerScores) setPlayerScores(payload.playerScores)
+      if (payload.submissions) {
+        setSubmissions(payload.submissions)
+        // If my submission is already in the list, mark as submitted
+        if (payload.submissions.some((s: Meme) => s.playerId === playerIdRef.current)) {
+          setHasSubmitted(true)
+        }
+      }
+      if (typeof payload.currentMemeIndex === "number") setCurrentMemeIndex(payload.currentMemeIndex)
+      if (payload.currentNiche !== undefined) setCurrentNiche(payload.currentNiche)
+      if (payload.nichePool) setNichePool(payload.nichePool)
+      if (payload.roundStartedAt) {
+        setRoundStartedAt(payload.roundStartedAt)
+        roundStartedAtRef.current = payload.roundStartedAt
+      }
+      if (payload.assignments) {
+        currentAssignmentsRef.current = payload.assignments
+        if (payload.assignments[playerIdRef.current]) {
+          setMyMemeUrl(payload.assignments[playerIdRef.current])
+        }
+      }
+      setIsLoading(false)
     })
 
     channel.subscribe(async (status) => {
       if (status === "SUBSCRIBED") {
         await channel.track(player)
+        // If not host, immediately request the current game state
+        if (!player.isHost) {
+          channel.send({
+            type: "broadcast",
+            event: "game:request-sync",
+            payload: { player, isReconnect, isLateJoin },
+          })
+        }
       }
     })
 
@@ -364,6 +612,7 @@ export function useGameRoom() {
   const createRoom = useCallback(async (pseudo: string) => {
     setIsLoading(true)
     setError(null)
+    sessionStorage.removeItem(SESSION_STORAGE_KEY)
     try {
       let code = generateRoomCode()
       let attempts = 0
@@ -399,24 +648,33 @@ export function useGameRoom() {
     setIsLoading(true)
     setError(null)
     try {
+      const formattedCode = code.trim().toUpperCase()
       const { data, error: fetchError } = await supabase
-        .from("rooms").select("*").eq("code", code).single()
+        .from("rooms").select("code, status, host_id").eq("code", formattedCode).single()
       if (fetchError || !data) {
         setError("Salon introuvable ! Vérifie le code.")
         return
       }
-      if (data.status !== "waiting") {
-        setError("Cette partie a déjà commencé !")
+      if (data.status === "closed") {
+        setError("Cette partie est terminée !")
         return
       }
+
+      const isHost = data.host_id === playerIdRef.current
       const player: Player = {
-        id: playerIdRef.current, pseudo,
-        avatar: getRandomAvatar(), score: 0, isHost: false,
+        id: playerIdRef.current, pseudo: pseudo.trim(),
+        avatar: getRandomAvatar(), score: 0, isHost,
       }
       setCurrentPlayer(player)
-      setRoomCode(code)
-      subscribeToRoom(code, player)
-      setPhase("lobby")
+      setRoomCode(formattedCode)
+
+      if (data.status === "waiting") {
+        setPhase("lobby")
+        subscribeToRoom(formattedCode, player)
+      } else {
+        // Status is "playing" — allowed to join an ongoing game!
+        subscribeToRoom(formattedCode, player, false, true /* isLateJoin */)
+      }
     } catch {
       setError("Erreur lors de la connexion au salon")
     } finally {
@@ -444,12 +702,16 @@ export function useGameRoom() {
     usedNicheCountRef.current = {}
     const playerIds = players.map((p) => p.id)
     const assignments = assignRandomMemes(playerIds, selectedPack.memes, usedMemeUrlsRef.current)
+    currentAssignmentsRef.current = assignments
 
     // Draw niche for round 1
     const niche = drawNiche(nichePool, usedNicheCountRef.current, settings.gameMode)
+    const now = Date.now()
 
     setMyMemeUrl(assignments[playerIdRef.current] || "")
     setCurrentNiche(niche)
+    setRoundStartedAt(now)
+    roundStartedAtRef.current = now
     setPhase("creation")
     setCurrentRound(1)
     setPlayerScores({})
@@ -459,7 +721,7 @@ export function useGameRoom() {
     setHasUsedHeart(false)
     channelRef.current.send({
       type: "broadcast", event: "game:start",
-      payload: { pack: selectedPack, assignments, settings, niche },
+      payload: { pack: selectedPack, assignments, settings, niche, roundStartedAt: now },
     })
   }, [currentPlayer, selectedPack, roomCode, settings, players, nichePool])
 
@@ -494,7 +756,7 @@ export function useGameRoom() {
     setHasVotedOnCurrent(true)
     if (isHeart) setHasUsedHeart(true)
     
-    setCurrentVoters((prev) => [...prev, currentPlayer.id])
+    setCurrentVoters((prev) => prev.includes(currentPlayer.id) ? prev : [...prev, currentPlayer.id])
     setSubmissions((prev) => prev.map((m) => (m.id === memeId ? { ...m, votes: m.votes + finalScore } : m)))
     channelRef.current.send({
       type: "broadcast", event: "game:vote",
@@ -538,7 +800,6 @@ export function useGameRoom() {
     if (!currentMeme) return
     const eligibleVoters = players.filter((p) => p.id !== currentMeme.playerId).length
     if (eligibleVoters > 0 && currentVoters.length >= eligibleVoters) {
-      // Small delay so last voter sees their vote registered
       const timer = setTimeout(() => advanceMeme(), 1000)
       return () => clearTimeout(timer)
     }
@@ -548,7 +809,6 @@ export function useGameRoom() {
   useEffect(() => {
     if (phase !== "creation" || !currentPlayer?.isHost) return
     if (submissions.length > 0 && submissions.length >= players.length) {
-      // Small delay before moving to voting
       const timer = setTimeout(() => moveToVoting(), 2000)
       return () => clearTimeout(timer)
     }
@@ -565,23 +825,24 @@ export function useGameRoom() {
     if (!currentPlayer?.isHost || !channelRef.current || !selectedPack) return
 
     if (currentRound >= settings.totalRounds) {
-      // Last round → final results
       setPhase("final-results")
       channelRef.current.send({
         type: "broadcast", event: "game:final",
         payload: { scores: playerScores },
       })
     } else {
-      // More rounds to play
       const nextRoundNum = currentRound + 1
       const playerIds = players.map((p) => p.id)
       const assignments = assignRandomMemes(playerIds, selectedPack.memes, usedMemeUrlsRef.current)
+      currentAssignmentsRef.current = assignments
 
-      // Draw niche for next round
       const niche = drawNiche(nichePool, usedNicheCountRef.current, settings.gameMode)
+      const now = Date.now()
 
       setMyMemeUrl(assignments[playerIdRef.current] || "")
       setCurrentNiche(niche)
+      setRoundStartedAt(now)
+      roundStartedAtRef.current = now
       setPhase("creation")
       setCurrentRound(nextRoundNum)
       setSubmissions([])
@@ -590,7 +851,7 @@ export function useGameRoom() {
       setCurrentMemeIndex(0)
       channelRef.current.send({
         type: "broadcast", event: "game:next-round",
-        payload: { assignments, round: nextRoundNum, niche, settings },
+        payload: { assignments, round: nextRoundNum, niche, settings, roundStartedAt: now },
       })
     }
   }, [currentPlayer, selectedPack, currentRound, settings, playerScores, players, nichePool])
@@ -607,7 +868,8 @@ export function useGameRoom() {
     setMyMemeUrl("")
     setHasUsedHeart(false)
     setCurrentNiche(null)
-    // Keep nichePool so players don't have to re-add everything for a rematch
+    setRoundStartedAt(undefined)
+    currentAssignmentsRef.current = {}
     usedNicheCountRef.current = {}
     usedMemeUrlsRef.current.clear()
     await supabase.from("rooms").update({ status: "waiting" }).eq("code", roomCode)
@@ -615,6 +877,10 @@ export function useGameRoom() {
   }, [currentPlayer, roomCode])
 
   const leaveRoom = useCallback(async () => {
+    sessionStorage.removeItem(SESSION_STORAGE_KEY)
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", "/")
+    }
     if (channelRef.current) {
       await channelRef.current.untrack()
       supabase.removeChannel(channelRef.current)
@@ -637,6 +903,8 @@ export function useGameRoom() {
     setCurrentRound(1)
     setPlayerScores({})
     setSettings(DEFAULT_SETTINGS)
+    setRoundStartedAt(undefined)
+    currentAssignmentsRef.current = {}
   }, [currentPlayer, roomCode])
 
   // Library management
@@ -669,7 +937,6 @@ export function useGameRoom() {
     const clean = text.trim().slice(0, 100)
     if (!clean) return
     setNichePool((prev) => {
-      // Dedup (case-insensitive)
       if (prev.some((n) => n.text.toLowerCase() === clean.toLowerCase())) return prev
       const next: NichePoolItem[] = [
         ...prev,
@@ -680,12 +947,19 @@ export function useGameRoom() {
     })
   }, [])
 
+  
+
+  const clearNichePool = useCallback((isHost: boolean) => {
+    if (!channelRef.current || !isHost) return
+    setNichePool([])
+    channelRef.current?.send({ type: "broadcast", event: "niche:pool-sync", payload: { pool: [] } })
+  }, [])
+
   const removeNicheFromPool = useCallback((id: string, requesterId: string, isHost: boolean) => {
     if (!channelRef.current) return
     setNichePool((prev) => {
       const target = prev.find((n) => n.id === id)
       if (!target) return prev
-      // Only host or the original adder can remove
       if (!isHost && target.addedBy !== requesterId) return prev
       const next = prev.filter((n) => n.id !== id)
       channelRef.current?.send({ type: "broadcast", event: "niche:pool-sync", payload: { pool: next } })
@@ -713,7 +987,7 @@ export function useGameRoom() {
 
   return {
     phase, roomCode, players, currentPlayer,
-    settings, currentRound, playerScores,
+    settings, currentRound, playerScores, roundStartedAt,
     memePacks, packsLoading,
     selectedPack, myMemeUrl,
     submissions, currentMemeIndex, hasSubmitted,
@@ -727,6 +1001,6 @@ export function useGameRoom() {
     refreshMeme, refreshesLeft,
     setError,
     createLibrary, deleteLibrary, addMemeToLibrary, removeMemeFromLibrary,
-    addNicheToPool, removeNicheFromPool,
+    addNicheToPool, removeNicheFromPool, clearNichePool,
   }
 }

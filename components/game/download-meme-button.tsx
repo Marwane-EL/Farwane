@@ -6,6 +6,7 @@ import { Download, Loader2 } from "lucide-react"
 import * as htmlToImage from "html-to-image"
 import type { Meme } from "@/types/game"
 import { toast } from "sonner"
+import { getApiBase } from "@/lib/utils"
 
 interface DownloadMemeButtonProps {
   meme: Meme
@@ -67,7 +68,8 @@ export function DownloadMemeButton({ meme, className }: DownloadMemeButtonProps)
       imgContainer.style.marginBottom = "24px"
 
       const isVideo = /\.(mp4|webm|mov)(\?|$)/i.test(meme.imageUrl)
-      const proxiedUrl = `/api/proxy?url=${encodeURIComponent(meme.imageUrl)}`
+      const apiBase = getApiBase()
+      const proxiedUrl = `${apiBase}/api/proxy?url=${encodeURIComponent(meme.imageUrl)}`
       
       const img = document.createElement("img")
       img.crossOrigin = "anonymous"

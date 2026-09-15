@@ -17,6 +17,7 @@ interface NichePoolLobbyProps {
   personalNiches: NicheItem[]         // from useNicheLibrary
   onAdd: (text: string, saveToLibrary: boolean) => void
   onRemove: (id: string) => void
+  onClearAll?: () => void
 }
 
 export function NichePoolLobby({
@@ -28,6 +29,7 @@ export function NichePoolLobby({
   personalNiches,
   onAdd,
   onRemove,
+  onClearAll,
 }: NichePoolLobbyProps) {
   const [input, setInput] = useState("")
   const [saveToLibrary, setSaveToLibrary] = useState(false)
@@ -51,65 +53,82 @@ export function NichePoolLobby({
     <div className="space-y-2">
       <div className="flex items-center gap-2 text-xs text-muted-foreground font-bold uppercase tracking-wide">
         <Tag className="h-3.5 w-3.5 text-accent" />
-        <span>Niches pour cette partie</span>
-        <span className={`ml-auto px-2 py-0.5 rounded-full text-xs font-bold ${
-          isNicheMode
-            ? hasEnough
-              ? "bg-accent/20 text-accent border border-accent/40"
-              : "bg-destructive/20 text-destructive border border-destructive/40"
-            : "bg-muted/50 text-muted-foreground"
-        }`}>
-          {nichePool.length} {isNicheMode ? `/ ${minRequiredNiches} min` : "niche" + (nichePool.length > 1 ? "s" : "")}
-        </span>
+        <span>Niches pour la partie</span>
+        <div className="ml-auto flex items-center gap-2">
+          {isHost && nichePool.length > 0 && onClearAll && (
+            <button
+              type="button"
+              onClick={onClearAll}
+              className="text-[11px] text-muted-foreground hover:text-destructive flex items-center gap-1 font-bold transition-colors hover:underline"
+              title="Supprimer toutes les niches de la partie"
+            >
+              <Trash2 className="h-3 w-3" />
+              Tout effacer
+            </button>
+          )}
+          <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+            isNicheMode
+              ? hasEnough
+                ? "bg-accent/20 text-accent border border-accent/40"
+                : "bg-destructive/20 text-destructive border border-destructive/40"
+              : "bg-muted/50 text-muted-foreground"
+          }`}>
+            {nichePool.length} {isNicheMode ? `/ ${minRequiredNiches} min` : "niche" + (nichePool.length > 1 ? "s" : "")}
+          </span>
+        </div>
       </div>
 
       {/* Mode Niche requirements indicator */}
       {isNicheMode && !hasEnough && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-secondary/15 border border-secondary/40 text-secondary text-xs font-bold">
+        <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-secondary/15 border border-secondary/40 text-secondary text-xs font-bold">
           <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-          <span>Ajoutez encore {missingNiches} niche{missingNiches > 1 ? "s" : ""} pour activer le Mode Niches ({minRequiredNiches} requises pour cette durée)</span>
+          <span>Ajoutez encore {missingNiches} niche{missingNiches > 1 ? "s" : ""} requise{missingNiches > 1 ? "s" : ""}</span>
         </div>
       )}
 
-      {/* Pool list */}
-      {nichePool.length > 0 && (
-        <ul className="space-y-1 max-h-36 overflow-y-auto pr-1">
+      {/* Pool list as compact wrap chips */}
+      {nichePool.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
           {nichePool.map((niche) => {
             const canRemove = isHost || niche.addedBy === currentPlayerId
             return (
-              <li
+              <span
                 key={niche.id}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/30 border border-border/40 group text-sm"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-muted/40 border border-border/60 text-xs font-medium group hover:border-accent/40 transition-colors"
               >
-                <span className="flex-1 font-medium truncate">{niche.text}</span>
+                <span className="truncate max-w-[130px] sm:max-w-[170px]">{niche.text}</span>
                 {canRemove && (
                   <button
+                    type="button"
                     onClick={() => onRemove(niche.id)}
-                    className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all"
+                    className="text-muted-foreground hover:text-destructive transition-colors ml-0.5"
+                    title="Supprimer la niche"
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <Trash2 className="h-3 w-3" />
                   </button>
                 )}
-              </li>
+              </span>
             )
           })}
-        </ul>
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground italic py-0.5">Aucune niche ajoutée pour l&apos;instant.</p>
       )}
 
       {/* Add input row */}
-      <div className="flex gap-1.5">
+      <div className="flex gap-1.5 pt-0.5">
         <input
           value={input}
           onChange={(e) => setInput(e.target.value.slice(0, 100))}
           onKeyDown={(e) => e.key === "Enter" && handleAdd()}
           placeholder={"Ajouter une niche..."}
-          className="flex-1 h-9 px-3 rounded-lg bg-muted/50 border-2 border-border focus:border-accent outline-none transition-colors text-sm"
+          className="flex-1 h-8 px-2.5 rounded-md bg-muted/50 border-2 border-border focus:border-accent outline-none transition-colors text-xs sm:text-sm"
         />
         {personalNiches.length > 0 && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-9 px-2 shrink-0" title="Depuis ma bibliothèque">
-                <BookOpen className="h-4 w-4" />
+              <Button variant="outline" size="sm" className="h-8 px-2 shrink-0" title="Depuis ma bibliothèque">
+                <BookOpen className="h-3.5 w-3.5" />
                 <ChevronDown className="h-3 w-3 ml-0.5" />
               </Button>
             </DropdownMenuTrigger>
@@ -121,7 +140,7 @@ export function NichePoolLobby({
                 <DropdownMenuItem
                   key={niche.id}
                   onClick={() => handleAddFromLibrary(niche)}
-                  className="cursor-pointer text-sm font-medium"
+                  className="cursor-pointer text-xs font-medium"
                   disabled={nichePool.some((n) => n.text.toLowerCase() === niche.text.toLowerCase())}
                 >
                   {niche.text}
@@ -135,14 +154,14 @@ export function NichePoolLobby({
           variant="accent"
           onClick={handleAdd}
           disabled={!input.trim()}
-          className="h-9 px-3 font-black shrink-0"
+          className="h-8 px-2.5 font-black shrink-0"
         >
-          <Plus className="h-4 w-4" />
+          <Plus className="h-3.5 w-3.5" />
         </Button>
       </div>
 
       {/* Save to library checkbox */}
-      <label className="flex items-center gap-2 cursor-pointer text-xs text-muted-foreground font-medium select-none w-fit">
+      <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-muted-foreground font-medium select-none w-fit">
         <input
           type="checkbox"
           checked={saveToLibrary}

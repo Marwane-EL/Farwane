@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Trophy, Medal, Award, RotateCcw, Home, Sparkles, Loader2, Star } from "lucide-react"
 import { MemeMedia } from "@/components/game/meme-media"
 import { DownloadMemeButton } from "@/components/game/download-meme-button"
+import { RoomCodeBadge } from "@/components/game/room-code-badge"
 import type { Meme, Player } from "@/types/game"
 
 interface ResultsViewProps {
@@ -16,12 +17,14 @@ interface ResultsViewProps {
   onPlayAgain: () => void
   onBackToHome: () => void
   isHost: boolean
+  roomCode?: string
 }
 
 export function ResultsView({
   memes, players, playerScores,
   currentRound, totalRounds,
   onPlayAgain, onBackToHome, isHost,
+  roomCode,
 }: ResultsViewProps) {
   const sortedMemes = [...memes].sort((a, b) => b.votes - a.votes)
   const topThree = sortedMemes.slice(0, 3)
@@ -73,10 +76,13 @@ export function ResultsView({
       <div className="flex flex-col items-center px-3 py-3 sm:px-4 sm:py-6 pb-4 min-h-full">
 
         {/* Title */}
-        <div className="text-center mb-3 sm:mb-5 animate-in fade-in slide-in-from-top-4 duration-500 shrink-0">
-          <p className="text-xs font-black text-muted-foreground uppercase tracking-widest mb-1">
-            Manche {currentRound}/{totalRounds}
-          </p>
+        <div className="text-center mb-3 sm:mb-5 animate-in fade-in slide-in-from-top-4 duration-500 shrink-0 flex flex-col items-center">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">
+              Manche {currentRound}/{totalRounds}
+            </span>
+            {roomCode && <RoomCodeBadge roomCode={roomCode} />}
+          </div>
           <div className="flex items-center justify-center gap-2 sm:gap-3">
             <Sparkles className="h-5 w-5 sm:h-7 sm:w-7 text-secondary animate-pulse" />
             <h1 className="text-2xl sm:text-3xl md:text-5xl font-black tracking-tight shimmer-text">

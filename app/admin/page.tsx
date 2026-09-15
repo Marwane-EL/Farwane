@@ -6,6 +6,7 @@ import {
   Eye, EyeOff, Package, ImageIcon, X, Loader2,
   Upload, Sparkles, Check, AlertCircle, RefreshCw, Link, Copy, Wand2
 } from "lucide-react"
+import { getApiBase } from "@/lib/utils"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -21,7 +22,7 @@ interface MemePack {
 
 function adminFetch(url: string, options: RequestInit = {}) {
   const token = sessionStorage.getItem("admin_token") ?? ""
-  return fetch(url, {
+  return fetch(`${getApiBase()}${url}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -44,7 +45,7 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
     setLoading(true)
     setError("")
     try {
-      const res = await fetch("/api/admin/verify", {
+      const res = await fetch(`${getApiBase()}/api/admin/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password }),
@@ -355,7 +356,7 @@ function PackCard({ pack, onUpdated, onDeleted }: { pack: MemePack; onUpdated: (
     if (memes.length === 0) return
     setAddLoading(true)
     try {
-      const res = await adminFetch(`/api/admin/packs/${pack.id}/memes`, {
+      const res = await adminFetch(`/api/admin/packs/memes?id=${pack.id}`, {
         method: "POST",
         body: JSON.stringify({ memes }),
       })
@@ -377,7 +378,7 @@ function PackCard({ pack, onUpdated, onDeleted }: { pack: MemePack; onUpdated: (
   const handleRemoveMeme = async (index: number) => {
     setRemovingIndex(index)
     try {
-      const res = await adminFetch(`/api/admin/packs/${pack.id}/memes?index=${index}`, { method: "DELETE" })
+      const res = await adminFetch(`/api/admin/packs/memes?id=${pack.id}&index=${index}`, { method: "DELETE" })
       if (res.ok) { showFeedback("ok", "Mème supprimé"); onUpdated() }
       else { const d = await res.json(); showFeedback("err", d.error ?? "Erreur") }
     } catch {
@@ -405,7 +406,7 @@ function PackCard({ pack, onUpdated, onDeleted }: { pack: MemePack; onUpdated: (
     setFixLoading(true)
     setFixProgress({ processed: 0, total: pack.memes.length })
     try {
-      const res = await adminFetch(`/api/admin/packs/${pack.id}/fix`, { method: "POST" })
+      const res = await adminFetch(`/api/admin/packs/fix?id=${pack.id}`, { method: "POST" })
       if (!res.ok || !res.body) {
         showFeedback("err", "Erreur de connexion au serveur")
         return

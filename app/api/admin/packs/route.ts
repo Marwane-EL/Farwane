@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { normalizeMemeUrls } from "@/lib/utils"
 
+export const dynamic = "force-static"
+
 // Server-side Supabase client using service role for admin operations
 function getAdminClient() {
   return createClient(

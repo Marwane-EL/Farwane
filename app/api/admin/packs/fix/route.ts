@@ -1,5 +1,7 @@
-import { NextResponse } from "next/server"
+﻿import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+
+export const dynamic = "force-static"
 
 function getAdminClient() {
   return createClient(
@@ -13,15 +15,11 @@ function isAuthenticated(req: Request): boolean {
   return token === process.env.ADMIN_PASSWORD
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
 async function resolveTenorUrl(url: string): Promise<string> {
   if (!url.includes("tenor.com/view/")) return url
   try {
     const oembedUrl = `https://tenor.com/oembed?url=${encodeURIComponent(url)}`
-    const res = await fetch(oembedUrl, {
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; bot)" },
-    })
+    const res = await fetch(oembedUrl, { headers: { "User-Agent": "Mozilla/5.0 (compatible; bot)" } })
     if (!res.ok) return url
     const data = await res.json()
     const thumbnail: string | undefined = data.thumbnail_url
@@ -45,16 +43,15 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return chunks
 }
 
-// ─── Route ────────────────────────────────────────────────────────────────────
-
-// POST /api/admin/packs/[id]/fix
-// Returns a Server-Sent Events stream: { processed, total } progress ticks,
-// then a final { done, fixedCount, pack } event.
-export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+// POST /api/admin/packs/fix?id=PACK_ID
+export async function POST(req: Request) {
   if (!isAuthenticated(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
-  const { id } = await params
+  const { searchParams } = new URL(req.url)
+  const id = searchParams.get("id")
+  if (!id) return NextResponse.json({ error: "id required" }, { status: 400 })
+
   const supabase = getAdminClient()
 
   const { data: pack, error: fetchErr } = await supabase
@@ -77,9 +74,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const send = (obj: object) =>
     writer.write(enc.encode(`data: ${JSON.stringify(obj)}\n\n`))
 
-  // Kick off background processing
   ;(async () => {
-    // Pass-through non-Tenor URLs immediately
     const tenorIndices: number[] = []
     currentMemes.forEach((url, i) => {
       if (url.includes("tenor.com/view/")) {
@@ -90,10 +85,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       }
     })
 
-    // Send initial progress (non-Tenor URLs already done)
     await send({ processed, total })
 
-    // Resolve Tenor URLs in batches of 5 with 200ms delay between batches
     const tenorUrls = tenorIndices.map(i => currentMemes[i])
     const batches = chunk(tenorUrls, 5)
     let batchStart = 0
@@ -117,7 +110,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       }
     }
 
-    // Save to DB
     const fixedCount = resolved.filter((m, i) => m !== currentMemes[i]).length
 
     const { data: updated, error: updateErr } = await supabase

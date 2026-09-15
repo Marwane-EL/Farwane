@@ -19,7 +19,7 @@ export default function MemeGame() {
 
   const {
     phase, roomCode, players, currentPlayer,
-    settings, currentRound, playerScores,
+    settings, currentRound, playerScores, roundStartedAt,
     memePacks, packsLoading,
     selectedPack, myMemeUrl,
     submissions, currentMemeIndex, hasSubmitted,
@@ -33,7 +33,7 @@ export default function MemeGame() {
     refreshMeme, refreshesLeft,
     setError,
     createLibrary, deleteLibrary, addMemeToLibrary, removeMemeFromLibrary,
-    addNicheToPool, removeNicheFromPool,
+    addNicheToPool, removeNicheFromPool, clearNichePool,
   } = useGameRoom()
 
   const { niches: personalNiches, addNiche: addToPersonalLibrary } = useNicheLibrary()
@@ -86,12 +86,14 @@ export default function MemeGame() {
               if (save) addToPersonalLibrary(text)
             }}
             onRemoveNiche={(id) => removeNicheFromPool(id, currentPlayer?.id ?? "", currentPlayer?.isHost ?? false)}
+            onClearNiches={() => clearNichePool(currentPlayer?.isHost ?? false)}
             onStartGame={() => { resetTetrisScore(); startGame(); }}
             onLeave={() => { resetTetrisScore(); leaveRoom(); }}
           />
         )}
         {phase === "creation" && (
           <CreationView
+            roomCode={roomCode}
             currentMemeUrl={myMemeUrl}
             timerDuration={settings.timerDuration}
             onSubmit={submitMeme}
@@ -106,10 +108,13 @@ export default function MemeGame() {
             refreshesLeft={refreshesLeft}
             currentNiche={currentNiche}
             nichePool={nichePool}
+            roundStartedAt={roundStartedAt}
+            onLeave={() => { resetTetrisScore(); leaveRoom(); }}
           />
         )}
         {phase === "voting" && submissions.length > 0 && (
           <VotingView
+            roomCode={roomCode}
             meme={submissions[currentMemeIndex]}
             currentIndex={currentMemeIndex}
             totalMemes={submissions.length}
@@ -121,10 +126,12 @@ export default function MemeGame() {
             isHost={currentPlayer?.isHost || false}
             onForceAdvance={advanceMeme}
             hasUsedHeart={hasUsedHeart}
+            onLeave={() => { resetTetrisScore(); leaveRoom(); }}
           />
         )}
         {phase === "results" && (
           <ResultsView
+            roomCode={roomCode}
             memes={submissions}
             players={players}
             playerScores={playerScores}
@@ -137,6 +144,7 @@ export default function MemeGame() {
         )}
         {phase === "final-results" && (
           <FinalResultsView
+            roomCode={roomCode}
             players={players}
             playerScores={playerScores}
             onNewGame={() => { resetTetrisScore(); newGame(); }}

@@ -78,11 +78,6 @@ export function useTetris(gameOverCallback: () => void, initialScore = 0) {
   ] = useTetrisBoard();
 
   const startGame = useCallback(() => {
-    const startingBlocks = [
-      getRandomBlock(),
-      getRandomBlock(),
-      getRandomBlock(),
-    ];
     // Récupère le score cumulé et l'état du plateau sauvegardés entre les rounds
     const resumeScore = loadScoreFromLocalStorage();
     const { board: savedBoard, blocks: savedBlocks } = loadBoardFromLocalStorage();
@@ -93,19 +88,49 @@ export function useTetris(gameOverCallback: () => void, initialScore = 0) {
     setTickSpeed(getNormalTickSpeed(resumeScore));
 
     if (savedBoard && savedBlocks && savedBlocks.length >= 3) {
-      // Restaure le plateau et les blocs de la session précédente
-      setUpcomingBlocks(savedBlocks);
-      dispatchBoardState({
-        type: "restore",
-        newBoard: savedBoard,
-        newBlock: savedBlocks[savedBlocks.length - 1],
-      });
-    } else {
-      // Nouvelle partie vierge
-      setUpcomingBlocks(startingBlocks);
-      dispatchBoardState({ type: "start" });
+      const nextBlock = savedBlocks[savedBlocks.length - 1];
+      if (!hasCollisions(savedBoard, SHAPES[nextBlock].shape, 0, 3)) {
+        // Restaure le plateau valide
+        setUpcomingBlocks(savedBlocks);
+        dispatchBoardState({
+          type: "restore",
+          newBoard: savedBoard,
+          newBlock: nextBlock,
+        });
+        return;
+      }
     }
+
+    // Nouvelle partie vierge (pas de sauvegarde ou plateau bloqué/mort)
+    localStorage.removeItem("tetrisBoard");
+    localStorage.removeItem("tetrisUpcoming");
+    const startingBlocks = [
+      getRandomBlock(),
+      getRandomBlock(),
+      getRandomBlock(),
+    ];
+    setUpcomingBlocks(startingBlocks);
+    dispatchBoardState({ type: "start" });
   }, [dispatchBoardState]);
+
+  const restartGame = useCallback((resetScore = false) => {
+    localStorage.removeItem("tetrisBoard");
+    localStorage.removeItem("tetrisUpcoming");
+    if (resetScore) {
+      localStorage.removeItem("tetrisScore");
+      setScore(0);
+    }
+    const startingBlocks = [
+      getRandomBlock(),
+      getRandomBlock(),
+      getRandomBlock(),
+    ];
+    setUpcomingBlocks(startingBlocks);
+    setIsCommitting(false);
+    setIsPlaying(true);
+    setTickSpeed(getNormalTickSpeed(resetScore ? 0 : score));
+    dispatchBoardState({ type: "start" });
+  }, [dispatchBoardState, score]);
 
   const commitPosition = useCallback(() => {
     if (!hasCollisions(board, droppingShape, droppingRow + 1, droppingColumn)) {
@@ -139,10 +164,12 @@ export function useTetris(gameOverCallback: () => void, initialScore = 0) {
     if (hasCollisions(board, SHAPES[newBlock].shape, 0, 3)) {
       setIsPlaying(false);
       setTickSpeed(null);
+      setIsCommitting(false);
       // Efface l'état du plateau : le prochain "Rejouer" repart d'un plateau vide
       localStorage.removeItem("tetrisBoard");
       localStorage.removeItem("tetrisUpcoming");
       gameOverCallback(); // Call the gameOverCallback function when the game is over
+      return; // CRITIQUE : Ne pas enregistrer le plateau mort en localStorage !
     } else {
       setTickSpeed(getNormalTickSpeed(score + getPoints(numCleared)));
     }
@@ -283,6 +310,44 @@ export function useTetris(gameOverCallback: () => void, initialScore = 0) {
     };
   }, [dispatchBoardState, isPlaying, score]);
 
+  const moveLeft = useCallback(() => {
+    if (!isPlaying) return;
+    dispatchBoardState({ type: "move", isPressingLeft: true });
+  }, [isPlaying, dispatchBoardState]);
+
+  const moveRight = useCallback(() => {
+    if (!isPlaying) return;
+    dispatchBoardState({ type: "move", isPressingRight: true });
+  }, [isPlaying, dispatchBoardState]);
+
+  const rotate = useCallback(() => {
+    if (!isPlaying) return;
+    dispatchBoardState({ type: "move", isRotating: true });
+  }, [isPlaying, dispatchBoardState]);
+
+  const drop = useCallback(() => {
+    if (!isPlaying) return;
+    gameTick();
+  }, [isPlaying, gameTick]);
+
+  const startFastDrop = useCallback(() => {
+    if (!isPlaying) return;
+    setTickSpeed(TickSpeed.Fast);
+  }, [isPlaying]);
+
+  const stopFastDrop = useCallback(() => {
+    if (!isPlaying) return;
+    setTickSpeed(getNormalTickSpeed(score));
+  }, [isPlaying, score]);
+
+  const hardDrop = useCallback(() => {
+    if (!isPlaying) return;
+    const ghostRow = getGhostPosition();
+    dispatchBoardState({ type: "hardDrop", targetRow: ghostRow });
+    setIsCommitting(true);
+    setTickSpeed(TickSpeed.Sliding);
+  }, [isPlaying, getGhostPosition, dispatchBoardState]);
+
   const renderedBoard = structuredClone(board) as BoardShape;
   if (isPlaying) {
     addShapeToBoard(
@@ -307,9 +372,17 @@ export function useTetris(gameOverCallback: () => void, initialScore = 0) {
   return {
     board: renderedBoard,
     startGame,
+    restartGame,
     isPlaying,
     score,
     upcomingBlocks,
+    moveLeft,
+    moveRight,
+    rotate,
+    drop,
+    startFastDrop,
+    stopFastDrop,
+    hardDrop,
   };
 }
 

@@ -1,6 +1,8 @@
-import { NextResponse } from "next/server"
+﻿import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { normalizeMemeUrls } from "@/lib/utils"
+
+export const dynamic = "force-static"
 
 function getAdminClient() {
   return createClient(
@@ -14,20 +16,22 @@ function isAuthenticated(req: Request): boolean {
   return token === process.env.ADMIN_PASSWORD
 }
 
-// POST /api/admin/packs/[id]/memes — add URLs to an existing pack
+// POST /api/admin/packs/memes?id=PACK_ID — add URLs to an existing pack
 // Body: { memes: string[] }
-export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(req: Request) {
   if (!isAuthenticated(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
-  const { id } = await params
+  const { searchParams } = new URL(req.url)
+  const id = searchParams.get("id")
+  if (!id) return NextResponse.json({ error: "id required" }, { status: 400 })
+
   const { memes } = await req.json()
   if (!Array.isArray(memes)) {
     return NextResponse.json({ error: "memes array required" }, { status: 400 })
   }
 
   const supabase = getAdminClient()
-  // Fetch current memes
   const { data: pack, error: fetchErr } = await supabase
     .from("meme_packs")
     .select("memes")
@@ -49,13 +53,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   return NextResponse.json({ pack: data })
 }
 
-// DELETE /api/admin/packs/[id]/memes?index=N — remove one meme by index
-export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+// DELETE /api/admin/packs/memes?id=PACK_ID&index=N — remove one meme by index
+export async function DELETE(req: Request) {
   if (!isAuthenticated(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
-  const { id } = await params
   const { searchParams } = new URL(req.url)
+  const id = searchParams.get("id")
+  if (!id) return NextResponse.json({ error: "id required" }, { status: 400 })
+
   const index = parseInt(searchParams.get("index") ?? "-1", 10)
   if (index < 0) return NextResponse.json({ error: "index required" }, { status: 400 })
 

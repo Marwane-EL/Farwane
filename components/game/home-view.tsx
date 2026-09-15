@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
@@ -56,6 +56,17 @@ export function HomeView({
   const [newLibraryName, setNewLibraryName] = useState("")
   const [expandedLibrary, setExpandedLibrary] = useState<string | null>(null)
   const [newMemeUrl, setNewMemeUrl] = useState("")
+
+  // Pre-fill room code from URL query parameter if present (e.g. shared link ?room=ABCD)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search)
+      const roomParam = params.get("room")
+      if (roomParam) {
+        setJoinCode(roomParam.toUpperCase().slice(0, 4))
+      }
+    }
+  }, [])
 
   const { niches, addNiche, editNiche, deleteNiche } = useNicheLibrary()
 

@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Trophy, RotateCcw, Home, Sparkles, Crown, Loader2 } from "lucide-react"
+import { RoomCodeBadge } from "@/components/game/room-code-badge"
 import type { Player } from "@/types/game"
 
 interface FinalResultsViewProps {
@@ -11,10 +12,12 @@ interface FinalResultsViewProps {
   onNewGame: () => void
   onBackToHome: () => void
   isHost: boolean
+  roomCode?: string
 }
 
 export function FinalResultsView({
   players, playerScores, onNewGame, onBackToHome, isHost,
+  roomCode,
 }: FinalResultsViewProps) {
   const leaderboard = players
     .map((p) => ({ ...p, totalScore: playerScores[p.id] || 0 }))
@@ -27,7 +30,8 @@ export function FinalResultsView({
       <div className="flex flex-col items-center px-4 py-6 sm:py-10 min-h-full">
 
         {/* Celebration Title */}
-        <div className="text-center mb-6 sm:mb-10 animate-in fade-in slide-in-from-top-8 duration-700 shrink-0">
+        <div className="text-center mb-6 sm:mb-10 animate-in fade-in slide-in-from-top-8 duration-700 shrink-0 flex flex-col items-center">
+          {roomCode && <div className="mb-3"><RoomCodeBadge roomCode={roomCode} /></div>}
           <div className="flex items-center justify-center gap-3 sm:gap-4 mb-3">
             <Sparkles className="h-7 w-7 sm:h-10 sm:w-10 text-yellow-400 animate-pulse" />
             <Trophy className="h-12 w-12 sm:h-16 sm:w-16 text-yellow-400 animate-bounce" />

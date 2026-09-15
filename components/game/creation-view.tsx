@@ -11,6 +11,8 @@ import { TetrisGame } from "@/components/game/tetris/TetrisGame"
 import { Gamepad2 } from "lucide-react"
 import { NicheRoundPrompt } from "@/components/game/niche-round-prompt"
 import { NicheLotteryOverlay } from "@/components/game/niche-lottery-overlay"
+import { LeaveGameButton } from "@/components/game/leave-game-button"
+import { RoomCodeBadge } from "@/components/game/room-code-badge"
 import type { NichePoolItem } from "@/types/game"
 
 interface CreationViewProps {
@@ -28,6 +30,9 @@ interface CreationViewProps {
   refreshesLeft: number
   currentNiche: NichePoolItem | null
   nichePool?: NichePoolItem[]
+  roundStartedAt?: number
+  onLeave?: () => void
+  roomCode?: string
 }
 
 export function CreationView({
@@ -45,9 +50,18 @@ export function CreationView({
   refreshesLeft,
   currentNiche,
   nichePool = [],
+  roundStartedAt,
+  onLeave,
+  roomCode,
 }: CreationViewProps) {
-  const [isLotteryActive, setIsLotteryActive] = useState(!!currentNiche)
-  const [timeLeft, setTimeLeft] = useState(timerDuration)
+  const [isLotteryActive, setIsLotteryActive] = useState(!!currentNiche && !hasSubmitted)
+  const [timeLeft, setTimeLeft] = useState(() => {
+    if (roundStartedAt) {
+      const elapsed = Math.floor((Date.now() - roundStartedAt) / 1000)
+      return Math.max(0, timerDuration - elapsed)
+    }
+    return timerDuration
+  })
   const [caption, setCaption] = useState("")
   const [activeMiniGame, setActiveMiniGame] = useState<"pokemon" | "tetris">("pokemon")
   const captionRef = useRef("")
@@ -63,24 +77,44 @@ export function CreationView({
     onSubmitRef.current = onSubmit
   }, [onSubmit])
 
+  // Sync timeLeft when roundStartedAt updates (e.g. late sync)
+  useEffect(() => {
+    if (roundStartedAt) {
+      const elapsed = Math.floor((Date.now() - roundStartedAt) / 1000)
+      setTimeLeft(Math.max(0, timerDuration - elapsed))
+    }
+  }, [roundStartedAt, timerDuration])
+
   // Timer (only ticks when lottery is not active)
   useEffect(() => {
     if (isLotteryActive) return
 
     const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
+      if (roundStartedAt) {
+        const elapsed = Math.floor((Date.now() - roundStartedAt) / 1000)
+        const remaining = Math.max(0, timerDuration - elapsed)
+        setTimeLeft(remaining)
+        if (remaining <= 0) {
           clearInterval(timer)
-          if (captionRef.current.trim()) {
+          if (captionRef.current.trim() && !hasSubmitted) {
             onSubmitRef.current(captionRef.current)
           }
-          return 0
         }
-        return prev - 1
-      })
+      } else {
+        setTimeLeft((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer)
+            if (captionRef.current.trim() && !hasSubmitted) {
+              onSubmitRef.current(captionRef.current)
+            }
+            return 0
+          }
+          return prev - 1
+        })
+      }
     }, 1000)
     return () => clearInterval(timer)
-  }, [isLotteryActive])
+  }, [isLotteryActive, roundStartedAt, timerDuration, hasSubmitted])
 
   const handleSubmit = useCallback(() => {
     if (caption.trim()) {
@@ -103,6 +137,17 @@ export function CreationView({
       <div className="h-full w-full flex items-center justify-center overflow-y-auto">
         <div className="flex flex-col items-center justify-center py-4 px-4 pb-20 w-full max-w-4xl mx-auto">
           <div className="text-center animate-in fade-in zoom-in-95 duration-500 w-full flex flex-col items-center">
+            {/* Top row with Leave Game button and Room Code */}
+            <div className="w-full flex justify-between items-center mb-3 px-1">
+              <LeaveGameButton onLeave={onLeave} />
+              <div className="flex items-center gap-2">
+                {roomCode && <RoomCodeBadge roomCode={roomCode} />}
+                <span className="text-xs font-black text-muted-foreground uppercase tracking-wider hidden xs:inline bg-muted/30 px-2 py-1.5 rounded-lg border border-border">
+                  R{currentRound}/{totalRounds}
+                </span>
+              </div>
+            </div>
+
             {/* Submitted badge */}
             <div className="mb-3 px-5 py-3 rounded-lg border-2 border-accent bg-accent/10 shadow-[4px_4px_0px_oklch(0.6_0.22_145_/_0.4)] shrink-0 flex items-center gap-3">
               <CheckCircle className="h-6 w-6 sm:h-8 sm:w-8 text-accent shrink-0" />
@@ -142,7 +187,7 @@ export function CreationView({
             </div>
 
             {/* Minigame */}
-            <div className="w-full flex justify-center pb-2 relative z-0" style={{ height: '420px', maxHeight: '55vh' }}>
+            <div className="w-full flex justify-center pb-2 relative z-0" style={{ height: '440px', maxHeight: '58vh' }}>
               {activeMiniGame === "pokemon" ? <PokemonMemory /> : <TetrisGame roundNumber={currentRound} />}
             </div>
 
@@ -169,26 +214,32 @@ export function CreationView({
   }
 
   return (
-    <div className="h-full flex flex-col px-4 py-2 sm:py-4 overflow-hidden">
-      {/* Timer — neo-brut badge */}
-      <div className="flex justify-center mb-2 sm:mb-4 shrink-0 animate-in fade-in slide-in-from-top-4 duration-500">
+    <div className="h-full flex flex-col px-4 py-2 sm:py-4 overflow-hidden relative">
+      {/* Top Header: Leave Game button, Timer, and Round */}
+      <div className="w-full flex items-center justify-between mb-2 sm:mb-3 shrink-0 px-1 pt-1 animate-in fade-in slide-in-from-top-4 duration-500">
+        <div className="w-20 sm:w-24 flex justify-start">
+          <LeaveGameButton onLeave={onLeave} />
+        </div>
         <div
-          className={`flex items-center gap-2 px-4 py-2 sm:px-6 sm:py-2.5 rounded-lg border-2 font-black font-mono transition-all duration-300 ${isUrgent
-            ? "bg-destructive/15 border-destructive text-destructive shadow-[4px_4px_0px_oklch(0.45_0.25_25_/_0.5)] animate-pulse"
+          className={`flex items-center gap-2 px-3.5 py-1.5 sm:px-5 sm:py-2 rounded-lg border-2 font-black font-mono transition-all duration-300 ${isUrgent
+            ? "bg-destructive/15 border-destructive text-destructive shadow-[3px_3px_0px_oklch(0.45_0.25_25_/_0.5)] animate-pulse"
             : "bg-muted/40 border-border shadow-[3px_3px_0px_var(--border)]"
             }`}
         >
-          <Clock className={`h-5 w-5 sm:h-6 sm:w-6 ${isUrgent ? "animate-bounce" : ""}`} />
-          <span className="text-2xl sm:text-3xl tracking-wider">{formatTime(timeLeft)}</span>
-          <span className="text-xs sm:text-sm font-bold hidden sm:inline opacity-70">restants</span>
+          <Clock className={`h-4 w-4 sm:h-5 sm:w-5 ${isUrgent ? "animate-bounce" : ""}`} />
+          <span className="text-xl sm:text-2xl tracking-wider">{formatTime(timeLeft)}</span>
+          <span className="text-xs font-bold hidden sm:inline opacity-70">restants</span>
+        </div>
+        <div className="flex items-center gap-1.5 justify-end">
+          {roomCode && <RoomCodeBadge roomCode={roomCode} />}
+          <span className="text-xs font-black text-muted-foreground uppercase tracking-wider hidden sm:inline bg-muted/30 px-2 py-1.5 rounded-lg border border-border">
+            R{currentRound}/{totalRounds}
+          </span>
         </div>
       </div>
 
       {/* Round info */}
       <div className="text-center mb-2 sm:mb-3 shrink-0 animate-in fade-in slide-in-from-top-6 duration-500 delay-100">
-        <p className="text-xs font-black text-muted-foreground uppercase tracking-widest mb-0.5">
-          Manche {currentRound}/{totalRounds}
-        </p>
         <h2 className="text-base md:text-lg font-black text-foreground">
           Écris la légende la plus drôle ! 😂
         </h2>

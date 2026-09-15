@@ -6,6 +6,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Clock, ThumbsDown, Meh, Laugh, Sparkles, Users, SkipForward } from "lucide-react"
 import { MemeMedia } from "@/components/game/meme-media"
 import { DownloadMemeButton } from "@/components/game/download-meme-button"
+import { LeaveGameButton } from "@/components/game/leave-game-button"
+import { RoomCodeBadge } from "@/components/game/room-code-badge"
 import type { Meme } from "@/types/game"
 
 interface VotingViewProps {
@@ -20,6 +22,8 @@ interface VotingViewProps {
   isHost: boolean
   onForceAdvance: () => void
   hasUsedHeart: boolean
+  onLeave?: () => void
+  roomCode?: string
 }
 
 export function VotingView({
@@ -34,6 +38,8 @@ export function VotingView({
   isHost,
   onForceAdvance,
   hasUsedHeart,
+  onLeave,
+  roomCode,
 }: VotingViewProps) {
   const [timeLeft, setTimeLeft] = useState(20)
   const [selectedVote, setSelectedVote] = useState<string | null>(null)
@@ -86,6 +92,7 @@ export function VotingView({
       <div className="w-full max-w-2xl mb-2 animate-in fade-in slide-in-from-top-4 duration-500 shrink-0">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
+            <LeaveGameButton onLeave={onLeave} className="h-7 px-2" />
             <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">
               Meme {currentIndex + 1}/{totalMemes}
             </span>
@@ -94,16 +101,19 @@ export function VotingView({
               <span>{votedCount}/{eligibleVoters}</span>
             </div>
           </div>
-          {/* Neo-brut timer badge */}
-          <div
-            className={`flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg border-2 font-black font-mono transition-all duration-300 ${
-              isUrgent
-                ? "bg-destructive/20 border-destructive text-destructive shadow-[3px_3px_0px_oklch(0.45_0.25_25_/_0.6)] animate-pulse"
-                : "bg-muted/40 border-border shadow-[2px_2px_0px_var(--border)]"
-            }`}
-          >
-            <Clock className={`h-4 w-4 sm:h-5 sm:w-5 ${isUrgent ? "animate-bounce" : ""}`} />
-            <span className="text-lg sm:text-2xl">{timeLeft}s</span>
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {roomCode && <RoomCodeBadge roomCode={roomCode} />}
+            {/* Neo-brut timer badge */}
+            <div
+              className={`flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg border-2 font-black font-mono transition-all duration-300 ${
+                isUrgent
+                  ? "bg-destructive/20 border-destructive text-destructive shadow-[3px_3px_0px_oklch(0.45_0.25_25_/_0.6)] animate-pulse"
+                  : "bg-muted/40 border-border shadow-[2px_2px_0px_var(--border)]"
+              }`}
+            >
+              <Clock className={`h-4 w-4 sm:h-5 sm:w-5 ${isUrgent ? "animate-bounce" : ""}`} />
+              <span className="text-lg sm:text-2xl">{timeLeft}s</span>
+            </div>
           </div>
         </div>
 

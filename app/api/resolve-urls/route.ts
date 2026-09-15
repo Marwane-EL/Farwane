@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
 
+export const dynamic = "force-dynamic"
+
 // Resolves Tenor page URLs (tenor.com/view/...) to direct GIF URLs (media.tenor.com/...)
 // Non-Tenor URLs are returned as-is.
 // Strategy: Use Tenor oEmbed API to get thumbnail, then convert to GIF format.
@@ -99,7 +101,13 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json({ resolved })
+    return NextResponse.json({ resolved }, {
+      headers: {
+        // Allow Vercel Edge / CDN to cache resolved Tenor URLs for 24 h,
+        // serving stale results for up to 7 days while revalidating in background
+        "Cache-Control": "public, s-maxage=86400, stale-while-revalidate=604800",
+      },
+    })
   } catch {
     return NextResponse.json({ error: "Failed to resolve URLs" }, { status: 500 })
   }

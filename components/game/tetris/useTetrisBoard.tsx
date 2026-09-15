@@ -94,12 +94,13 @@ function rotateBlock(shape: BlockShape): BlockShape {
 }
 
 type Action = {
-  type: "start" | "drop" | "commit" | "move" | "restore";
+  type: "start" | "drop" | "commit" | "move" | "restore" | "hardDrop";
   newBoard?: BoardShape;
   newBlock?: Block;
   isPressingLeft?: boolean;
   isPressingRight?: boolean;
   isRotating?: boolean;
+  targetRow?: number;
 };
 
 function boardReducer(state: BoardState, action: Action): BoardState {
@@ -127,6 +128,11 @@ function boardReducer(state: BoardState, action: Action): BoardState {
       };
     case "drop":
       newState.droppingRow++;
+      break;
+    case "hardDrop":
+      if (action.targetRow !== undefined) {
+        newState.droppingRow = action.targetRow;
+      }
       break;
     case "commit":
       return {

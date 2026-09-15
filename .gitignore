@@ -6,6 +6,14 @@ __v0_jsx-dev-runtime.ts
 # Common ignores
 node_modules/
 .next/
+out/
 .env
 .env*.local
 .DS_Store
+
+# Temporary conversion folders & reports
+memes_h264/
+memes_h265/
+audit-report.json
+android/
+capacitor.config.ts
