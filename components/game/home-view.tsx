@@ -72,8 +72,9 @@ export function HomeView({
 
   const handleJoin = (e: React.FormEvent) => {
     e.preventDefault()
-    if (joinCode.length === 4 && pseudo.trim()) {
-      onJoinGame(joinCode.toUpperCase(), pseudo.trim())
+    const clean = joinCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase()
+    if (clean.length === 4 && pseudo.trim()) {
+      onJoinGame(clean, pseudo.trim())
     }
   }
 
@@ -196,7 +197,11 @@ export function HomeView({
                       type="text"
                       placeholder="CODE"
                       value={joinCode}
-                      onChange={(e) => { setJoinCode(e.target.value.toUpperCase().slice(0, 4)); onDismissError() }}
+                      onChange={(e) => {
+                        const clean = e.target.value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 4)
+                        setJoinCode(clean)
+                        onDismissError()
+                      }}
                       className="h-14 sm:h-16 text-center text-3xl font-black tracking-[0.6em] uppercase border-2 border-border focus-visible:border-primary"
                       maxLength={4}
                     />
@@ -219,6 +224,15 @@ export function HomeView({
                     {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Users className="mr-2 h-4 w-4" />}
                     Rejoindre
                   </Button>
+                  {!isLoading && (joinCode.length !== 4 || !pseudo.trim()) && (
+                    <p className="text-[11px] text-center text-muted-foreground font-medium animate-in fade-in">
+                      {joinCode.length !== 4 && !pseudo.trim()
+                        ? "Entre le code à 4 lettres et ton pseudo"
+                        : joinCode.length !== 4
+                        ? `Code incomplet (${joinCode.length}/4 lettres)`
+                        : "Entre ton pseudo pour rejoindre"}
+                    </p>
+                  )}
                 </form>
               </CardContent>
             </Card>

@@ -60,7 +60,7 @@ export function LobbyView({
 
   const isHost = currentPlayer?.isHost
   const minRequiredNiches = getMinNichesRequired(settings.totalRounds)
-  const hasEnoughNiches = settings.gameMode === "classic" || nichePool.length >= minRequiredNiches
+  const hasEnoughNiches = settings.gameMode !== "niche" || nichePool.length >= minRequiredNiches
   const canStart = Boolean(selectedPack && selectedPack.memes.length >= 3 && players.length >= 2 && hasEnoughNiches)
 
   const timerOptions = [30, 60, 90, 120]
