@@ -73,3 +73,17 @@ export interface NichePoolItem {
   text: string
   addedBy: string // player id — used to allow self-deletion
 }
+
+export interface ChatMessage {
+  id: string
+  playerId: string
+  pseudo: string
+  avatar: string
+  text: string
+  timestamp: number
+}
+
+export interface HeartRedistribution {
+  unusedCount: number
+  bonuses: Record<string, number> // playerId -> bonus points received from others' unused hearts
+}

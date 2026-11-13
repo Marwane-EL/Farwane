@@ -6,6 +6,7 @@ import { CreationView } from "@/components/game/creation-view"
 import { VotingView } from "@/components/game/voting-view"
 import { ResultsView } from "@/components/game/results-view"
 import { FinalResultsView } from "@/components/game/final-results-view"
+import { RoomChat } from "@/components/game/room-chat"
 import { useGameRoom } from "@/hooks/use-game-room"
 import { useNicheLibrary } from "@/hooks/use-niche-library"
 import { resetTetrisScore } from "@/components/game/tetris/TetrisGame"
@@ -26,6 +27,8 @@ export default function MemeGame() {
     hasVotedOnCurrent, currentVoters, hasUsedHeart,
     error, isLoading, libraries,
     nichePool, currentNiche,
+    chatMessages, sendChatMessage,
+    heartRedistribution,
     createRoom, joinRoom, leaveRoom,
     updateSettings, selectPack, startGame,
     submitMeme, moveToVoting, vote,
@@ -157,6 +160,14 @@ export default function MemeGame() {
             isHost={currentPlayer?.isHost || false}
             gameMode={settings.gameMode}
             codenames={codenames}
+            heartRedistribution={heartRedistribution}
+          />
+        )}
+        {phase !== "home" && currentPlayer && (
+          <RoomChat
+            messages={chatMessages}
+            currentPlayerId={currentPlayer.id}
+            onSendMessage={sendChatMessage}
           />
         )}
       </div>

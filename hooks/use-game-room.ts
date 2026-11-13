@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react"
 import { supabase } from "@/lib/supabase"
 import type { RealtimeChannel } from "@supabase/supabase-js"
-import type { Player, Meme, MemePack, MemeLibrary, GamePhase, GameSettings, NichePoolItem } from "@/types/game"
+import type { Player, Meme, MemePack, MemeLibrary, GamePhase, GameSettings, NichePoolItem, ChatMessage, HeartRedistribution } from "@/types/game"
 import { SECRET_CODENAMES } from "@/types/game"
 import { getCachedPacks } from "@/lib/packs-cache"
 import { getCachedMediaUrl } from "@/lib/media-cache"
@@ -139,6 +139,13 @@ export function useGameRoom() {
   // Synced voting state
   const [hasVotedOnCurrent, setHasVotedOnCurrent] = useState(false)
   const [currentVoters, setCurrentVoters] = useState<string[]>([])
+
+  // Live room chat (ephemeral via Supabase Realtime broadcast)
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+
+  // Track which players used their Coup de Coeur during the game
+  const heartVotersRef = useRef<Set<string>>(new Set())
+  const [heartRedistribution, setHeartRedistribution] = useState<HeartRedistribution | null>(null)
 
   // Libraries (persisted in localStorage)
   const [libraries, setLibraries] = useState<MemeLibrary[]>([])
@@ -432,6 +439,9 @@ export function useGameRoom() {
       setPlayerScores({})
       setSubmissions([])
       setHasSubmitted(false)
+      setHasUsedHeart(false)
+      heartVotersRef.current.clear()
+      setHeartRedistribution(null)
       setRefreshesLeft(payload.settings?.maxRefreshes ?? DEFAULT_SETTINGS.maxRefreshes)
       setCurrentNiche(payload.niche ?? null)
       if (payload.roundStartedAt) {
@@ -468,6 +478,9 @@ export function useGameRoom() {
         prev.map((m) => (m.id === payload.memeId ? { ...m, votes: m.votes + payload.score } : m))
       )
       setCurrentVoters((prev) => prev.includes(payload.voterId) ? prev : [...prev, payload.voterId])
+      if (payload.isHeart && payload.voterId) {
+        heartVotersRef.current.add(payload.voterId)
+      }
     })
 
     // Host advances everyone to next meme
@@ -505,6 +518,7 @@ export function useGameRoom() {
     channel.on("broadcast", { event: "game:final" }, ({ payload }) => {
       setPhase("final-results")
       setPlayerScores(payload.scores)
+      setHeartRedistribution(payload.heartRedistribution ?? null)
     })
 
     // New game (back to lobby)
@@ -518,9 +532,21 @@ export function useGameRoom() {
       setCurrentMemeIndex(0)
       setMyMemeUrl("")
       setHasUsedHeart(false)
+      heartVotersRef.current.clear()
+      setHeartRedistribution(null)
       setCurrentNiche(null)
       setRoundStartedAt(undefined)
       currentAssignmentsRef.current = {}
+    })
+
+    // Live room chat message
+    channel.on("broadcast", { event: "chat:message" }, ({ payload }) => {
+      const msg = payload?.message as ChatMessage | undefined
+      if (!msg) return
+      setChatMessages((prev) => {
+        if (prev.some((m) => m.id === msg.id)) return prev
+        return [...prev.slice(-99), msg]
+      })
     })
 
     // ─── Late Joiner & Reconnection State Sync ─────────────────────────────────
@@ -737,6 +763,8 @@ export function useGameRoom() {
     setHasSubmitted(false)
     setRefreshesLeft(settings.maxRefreshes)
     setHasUsedHeart(false)
+    heartVotersRef.current.clear()
+    setHeartRedistribution(null)
     channelRef.current.send({
       type: "broadcast", event: "game:start",
       payload: { pack: selectedPack, assignments, settings, niche, roundStartedAt: now, codenames: generatedCodenames },
@@ -775,15 +803,17 @@ export function useGameRoom() {
 
     const currentMeme = submissions[currentMemeIndex]
     const isAuthor = currentMeme?.playerId === currentPlayer.id
+    const isIncognitoSelfVote = settings.gameMode === "incognito" && isAuthor
 
     // In incognito mode, author vote is registered so everyone appears identical,
     // but the author's vote adds 0 points to their own meme!
-    const effectiveScore = (settings.gameMode === "incognito" && isAuthor) ? 0 : score
-    const finalScore = isHeart ? (effectiveScore > 0 ? effectiveScore + 10 : 0) : effectiveScore
+    const finalScore = isIncognitoSelfVote ? 0 : (isHeart ? score + 10 : score)
     
     setHasVotedOnCurrent(true)
-    if (isHeart && !(settings.gameMode === "incognito" && isAuthor)) {
+    const usedHeartThisVote = isHeart && !isIncognitoSelfVote
+    if (usedHeartThisVote) {
       setHasUsedHeart(true)
+      heartVotersRef.current.add(currentPlayer.id)
     }
     
     setCurrentVoters((prev) => prev.includes(currentPlayer.id) ? prev : [...prev, currentPlayer.id])
@@ -792,7 +822,7 @@ export function useGameRoom() {
     }
     channelRef.current.send({
       type: "broadcast", event: "game:vote",
-      payload: { memeId, score: finalScore, voterId: currentPlayer.id },
+      payload: { memeId, score: finalScore, voterId: currentPlayer.id, isHeart: usedHeartThisVote },
     })
   }, [currentPlayer, hasVotedOnCurrent, hasUsedHeart, submissions, currentMemeIndex, settings.gameMode])
 
@@ -868,10 +898,36 @@ export function useGameRoom() {
     if (!currentPlayer?.isHost || !channelRef.current || !selectedPack) return
 
     if (currentRound >= settings.totalRounds) {
+      // Redistribute any unused Coup de Coeur (10 pts each) equally among the OTHER (N - 1) players
+      const unusedGiverIds = players
+        .filter((p) => !heartVotersRef.current.has(p.id))
+        .map((p) => p.id)
+
+      const finalScores = { ...playerScores }
+      let redistribution: HeartRedistribution | null = null
+
+      if (unusedGiverIds.length > 0 && players.length > 1) {
+        const bonuses: Record<string, number> = {}
+        const otherCount = players.length - 1
+        for (const p of players) {
+          const unusedFromOthers = unusedGiverIds.filter((id) => id !== p.id).length
+          if (unusedFromOthers > 0) {
+            const bonus = Math.round((unusedFromOthers * 10) / otherCount)
+            if (bonus > 0) {
+              bonuses[p.id] = bonus
+              finalScores[p.id] = (finalScores[p.id] || 0) + bonus
+            }
+          }
+        }
+        redistribution = { unusedCount: unusedGiverIds.length, bonuses }
+      }
+
+      setPlayerScores(finalScores)
+      setHeartRedistribution(redistribution)
       setPhase("final-results")
       channelRef.current.send({
         type: "broadcast", event: "game:final",
-        payload: { scores: playerScores },
+        payload: { scores: finalScores, heartRedistribution: redistribution },
       })
     } else {
       const nextRoundNum = currentRound + 1
@@ -912,6 +968,8 @@ export function useGameRoom() {
     setCurrentMemeIndex(0)
     setMyMemeUrl("")
     setHasUsedHeart(false)
+    heartVotersRef.current.clear()
+    setHeartRedistribution(null)
     setCurrentNiche(null)
     setRoundStartedAt(undefined)
     currentAssignmentsRef.current = {}
@@ -944,11 +1002,14 @@ export function useGameRoom() {
     setMyMemeUrl("")
     setHasSubmitted(false)
     setHasUsedHeart(false)
+    heartVotersRef.current.clear()
+    setHeartRedistribution(null)
     setError(null)
     setCurrentRound(1)
     setPlayerScores({})
     setSettings(DEFAULT_SETTINGS)
     setRoundStartedAt(undefined)
+    setChatMessages([])
     currentAssignmentsRef.current = {}
   }, [currentPlayer, roomCode])
 
@@ -1030,6 +1091,36 @@ export function useGameRoom() {
     setRefreshesLeft((prev) => prev - 1)
   }, [refreshesLeft, selectedPack, myMemeUrl, hasSubmitted])
 
+  // Send live chat message
+  const sendChatMessage = useCallback((text: string) => {
+    if (!channelRef.current || !currentPlayer) return
+    const clean = text.trim().slice(0, 200)
+    if (!clean) return
+
+    const isMaskedIncognito =
+      settingsRef.current.gameMode === "incognito" &&
+      phaseRef.current !== "lobby" &&
+      phaseRef.current !== "final-results"
+
+    const message: ChatMessage = {
+      id: crypto.randomUUID(),
+      playerId: currentPlayer.id,
+      pseudo: isMaskedIncognito
+        ? (codenamesRef.current[currentPlayer.id] || "Fantôme 👻")
+        : currentPlayer.pseudo,
+      avatar: isMaskedIncognito ? "👻" : currentPlayer.avatar,
+      text: clean,
+      timestamp: Date.now(),
+    }
+
+    setChatMessages((prev) => [...prev.slice(-99), message])
+    channelRef.current.send({
+      type: "broadcast",
+      event: "chat:message",
+      payload: { message },
+    })
+  }, [currentPlayer])
+
   return {
     phase, roomCode, players, currentPlayer,
     settings, currentRound, playerScores, roundStartedAt,
@@ -1039,6 +1130,8 @@ export function useGameRoom() {
     hasVotedOnCurrent, currentVoters, hasUsedHeart,
     error, isLoading, libraries,
     nichePool, currentNiche,
+    chatMessages, sendChatMessage,
+    heartRedistribution,
     createRoom, joinRoom, leaveRoom,
     updateSettings, selectPack, startGame,
     submitMeme, moveToVoting, vote,

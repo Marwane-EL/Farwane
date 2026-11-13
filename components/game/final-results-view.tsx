@@ -2,9 +2,9 @@
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Trophy, RotateCcw, Home, Sparkles, Crown, Loader2, EyeOff } from "lucide-react"
+import { Trophy, RotateCcw, Home, Sparkles, Crown, Loader2, EyeOff, Heart } from "lucide-react"
 import { RoomCodeBadge } from "@/components/game/room-code-badge"
-import type { Player, GameMode } from "@/types/game"
+import type { Player, GameMode, HeartRedistribution } from "@/types/game"
 
 interface FinalResultsViewProps {
   players: Player[]
@@ -15,6 +15,7 @@ interface FinalResultsViewProps {
   roomCode?: string
   gameMode?: GameMode
   codenames?: Record<string, string>
+  heartRedistribution?: HeartRedistribution | null
 }
 
 export function FinalResultsView({
@@ -22,6 +23,7 @@ export function FinalResultsView({
   roomCode,
   gameMode,
   codenames,
+  heartRedistribution,
 }: FinalResultsViewProps) {
   const isIncognito = gameMode === "incognito"
   const leaderboard = players
@@ -93,6 +95,14 @@ export function FinalResultsView({
             <h3 className="text-center font-black text-xs sm:text-sm text-muted-foreground uppercase tracking-widest mb-3 sm:mb-4">
               {isIncognito ? "🎭 Le Grand Dévoilement Final" : "Classement final"}
             </h3>
+            {heartRedistribution && heartRedistribution.unusedCount > 0 && (
+              <div className="mb-3 px-3 py-2 rounded-lg border-2 border-red-500/40 bg-red-500/10 flex items-center justify-center gap-2 text-center animate-in fade-in duration-500">
+                <Heart className="h-4 w-4 text-red-500 fill-red-500 shrink-0" />
+                <p className="text-xs font-bold text-red-400">
+                  {heartRedistribution.unusedCount} Coup{heartRedistribution.unusedCount > 1 ? "s" : ""} de Cœur non utilisé{heartRedistribution.unusedCount > 1 ? "s" : ""} redistribué{heartRedistribution.unusedCount > 1 ? "s" : ""} aux autres joueurs !
+                </p>
+              </div>
+            )}
             <div className="space-y-2 sm:space-y-2.5">
               {leaderboard.map((player, i) => {
                 const rankBorder = i === 0
@@ -117,9 +127,16 @@ export function FinalResultsView({
                     <div className="flex-1 min-w-0">
                       <p className="font-bold text-sm sm:text-lg truncate">{player.pseudo}</p>
                     </div>
-                    <span className={`text-base sm:text-xl font-black shrink-0 ${rankColor}`}>
-                      {player.totalScore} pts
-                    </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {heartRedistribution?.bonuses[player.id] ? (
+                        <span className="px-1.5 py-0.5 rounded border border-red-500/40 bg-red-500/15 text-[10px] sm:text-xs font-black text-red-400">
+                          +{heartRedistribution.bonuses[player.id]} ❤️
+                        </span>
+                      ) : null}
+                      <span className={`text-base sm:text-xl font-black ${rankColor}`}>
+                        {player.totalScore} pts
+                      </span>
+                    </div>
                   </div>
                 )
               })}
