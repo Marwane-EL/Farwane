@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react"
 import { supabase } from "@/lib/supabase"
 import type { RealtimeChannel } from "@supabase/supabase-js"
-import type { Player, Meme, MemePack, MemeLibrary, GamePhase, GameSettings, NichePoolItem, ChatMessage, HeartRedistribution } from "@/types/game"
+import type { Player, Meme, MemePack, MemeLibrary, GamePhase, GameSettings, NichePoolItem, ChatMessage, HeartRedistribution, DuelEvent } from "@/types/game"
 import { SECRET_CODENAMES } from "@/types/game"
 import { getCachedPacks } from "@/lib/packs-cache"
 import { getCachedMediaUrl } from "@/lib/media-cache"
@@ -98,6 +98,7 @@ interface StoredSession {
 
 export function useGameRoom() {
   const channelRef = useRef<RealtimeChannel | null>(null)
+  const duelListenersRef = useRef<Set<(event: DuelEvent) => void>>(new Set())
   const playerIdRef = useRef<string>("")
   const usedMemeUrlsRef = useRef<Set<string>>(new Set())
   const usedNicheCountRef = useRef<Record<string, number>>({})
@@ -547,6 +548,13 @@ export function useGameRoom() {
         if (prev.some((m) => m.id === msg.id)) return prev
         return [...prev.slice(-99), msg]
       })
+    })
+
+    // 1v1 Mini-Game Duel events (Morpion / PFC)
+    channel.on("broadcast", { event: "duel:event" }, ({ payload }) => {
+      const event = payload?.event as DuelEvent | undefined
+      if (!event) return
+      duelListenersRef.current.forEach((cb) => cb(event))
     })
 
     // ─── Late Joiner & Reconnection State Sync ─────────────────────────────────
@@ -1121,6 +1129,22 @@ export function useGameRoom() {
     })
   }, [currentPlayer])
 
+  const sendDuelEvent = useCallback((event: DuelEvent) => {
+    if (!channelRef.current) return
+    channelRef.current.send({
+      type: "broadcast",
+      event: "duel:event",
+      payload: { event },
+    })
+  }, [])
+
+  const subscribeDuelEvents = useCallback((cb: (event: DuelEvent) => void) => {
+    duelListenersRef.current.add(cb)
+    return () => {
+      duelListenersRef.current.delete(cb)
+    }
+  }, [])
+
   return {
     phase, roomCode, players, currentPlayer,
     settings, currentRound, playerScores, roundStartedAt,
@@ -1131,6 +1155,7 @@ export function useGameRoom() {
     error, isLoading, libraries,
     nichePool, currentNiche,
     chatMessages, sendChatMessage,
+    sendDuelEvent, subscribeDuelEvents,
     heartRedistribution,
     createRoom, joinRoom, leaveRoom,
     updateSettings, selectPack, startGame,

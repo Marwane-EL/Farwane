@@ -8,12 +8,14 @@ import { Clock, Send, CheckCircle, Users, Loader2, RefreshCw } from "lucide-reac
 import { MemeMedia } from "@/components/game/meme-media"
 import { PokemonMemory } from "@/components/game/pokemon-memory"
 import { TetrisGame } from "@/components/game/tetris/TetrisGame"
-import { Gamepad2 } from "lucide-react"
+import { SnakeGame } from "@/components/game/snake/SnakeGame"
+import { DuelGame } from "@/components/game/duel/DuelGame"
+import { Gamepad2, Swords } from "lucide-react"
 import { NicheRoundPrompt } from "@/components/game/niche-round-prompt"
 import { NicheLotteryOverlay } from "@/components/game/niche-lottery-overlay"
 import { LeaveGameButton } from "@/components/game/leave-game-button"
 import { RoomCodeBadge } from "@/components/game/room-code-badge"
-import type { NichePoolItem } from "@/types/game"
+import type { NichePoolItem, DuelEvent, DuelPlayer } from "@/types/game"
 
 interface CreationViewProps {
   currentMemeUrl: string
@@ -33,6 +35,9 @@ interface CreationViewProps {
   roundStartedAt?: number
   onLeave?: () => void
   roomCode?: string
+  duelPlayer?: DuelPlayer
+  sendDuelEvent?: (event: DuelEvent) => void
+  subscribeDuelEvents?: (cb: (event: DuelEvent) => void) => () => void
 }
 
 export function CreationView({
@@ -53,6 +58,9 @@ export function CreationView({
   roundStartedAt,
   onLeave,
   roomCode,
+  duelPlayer,
+  sendDuelEvent,
+  subscribeDuelEvents,
 }: CreationViewProps) {
   const [isLotteryActive, setIsLotteryActive] = useState(!!currentNiche && !hasSubmitted)
   const [timeLeft, setTimeLeft] = useState(() => {
@@ -63,7 +71,7 @@ export function CreationView({
     return timerDuration
   })
   const [caption, setCaption] = useState("")
-  const [activeMiniGame, setActiveMiniGame] = useState<"pokemon" | "tetris">("pokemon")
+  const [activeMiniGame, setActiveMiniGame] = useState<"pokemon" | "tetris" | "snake" | "duel">("pokemon")
   const captionRef = useRef("")
 
   // Keep ref in sync with state
@@ -166,7 +174,7 @@ export function CreationView({
             </div>
 
             {/* Minigame switcher — neo-brut */}
-            <div className="flex gap-2 mb-3 shrink-0">
+            <div className="flex flex-wrap justify-center gap-2 mb-3 shrink-0">
               <Button
                 variant={activeMiniGame === "pokemon" ? "default" : "outline"}
                 size="sm"
@@ -184,11 +192,43 @@ export function CreationView({
                 <Gamepad2 className="w-3 h-3 mr-1" />
                 Tetris
               </Button>
+              <Button
+                variant={activeMiniGame === "snake" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setActiveMiniGame("snake")}
+                className="h-8 px-4 rounded-full text-xs font-black"
+              >
+                <Gamepad2 className="w-3 h-3 mr-1" />
+                Snake
+              </Button>
+              {duelPlayer && sendDuelEvent && subscribeDuelEvents && (
+                <Button
+                  variant={activeMiniGame === "duel" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setActiveMiniGame("duel")}
+                  className="h-8 px-4 rounded-full text-xs font-black"
+                >
+                  <Swords className="w-3 h-3 mr-1" />
+                  Duel 1v1
+                </Button>
+              )}
             </div>
 
             {/* Minigame */}
             <div className="w-full flex justify-center pb-2 relative z-0" style={{ height: '440px', maxHeight: '58vh' }}>
-              {activeMiniGame === "pokemon" ? <PokemonMemory /> : <TetrisGame roundNumber={currentRound} />}
+              {activeMiniGame === "pokemon" ? (
+                <PokemonMemory />
+              ) : activeMiniGame === "tetris" ? (
+                <TetrisGame roundNumber={currentRound} />
+              ) : activeMiniGame === "snake" ? (
+                <SnakeGame roundNumber={currentRound} />
+              ) : duelPlayer && sendDuelEvent && subscribeDuelEvents ? (
+                <DuelGame
+                  me={duelPlayer}
+                  sendDuelEvent={sendDuelEvent}
+                  subscribeDuelEvents={subscribeDuelEvents}
+                />
+              ) : null}
             </div>
 
             {isHost && submissionCount >= 1 && submissionCount < totalPlayers && (

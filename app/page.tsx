@@ -10,6 +10,12 @@ import { RoomChat } from "@/components/game/room-chat"
 import { useGameRoom } from "@/hooks/use-game-room"
 import { useNicheLibrary } from "@/hooks/use-niche-library"
 import { resetTetrisScore } from "@/components/game/tetris/TetrisGame"
+import { resetSnakeScore } from "@/components/game/snake/SnakeGame"
+
+function resetMiniGames() {
+  resetMiniGames()
+  resetSnakeScore()
+}
 
 export default function MemeGame() {
   const [mounted, setMounted] = useState(false)
@@ -28,6 +34,7 @@ export default function MemeGame() {
     error, isLoading, libraries,
     nichePool, currentNiche,
     chatMessages, sendChatMessage,
+    sendDuelEvent, subscribeDuelEvents,
     heartRedistribution,
     createRoom, joinRoom, leaveRoom,
     updateSettings, selectPack, startGame,
@@ -41,6 +48,17 @@ export default function MemeGame() {
   } = useGameRoom()
 
   const { niches: personalNiches, addNiche: addToPersonalLibrary } = useNicheLibrary()
+
+  const duelPlayer = currentPlayer
+    ? {
+        id: currentPlayer.id,
+        name:
+          settings.gameMode === "incognito"
+            ? codenames[currentPlayer.id] || "Fantôme 👻"
+            : currentPlayer.pseudo,
+        avatar: settings.gameMode === "incognito" ? "👻" : currentPlayer.avatar,
+      }
+    : undefined
 
 
   return (
@@ -91,8 +109,8 @@ export default function MemeGame() {
             }}
             onRemoveNiche={(id) => removeNicheFromPool(id, currentPlayer?.id ?? "", currentPlayer?.isHost ?? false)}
             onClearNiches={() => clearNichePool(currentPlayer?.isHost ?? false)}
-            onStartGame={() => { resetTetrisScore(); startGame(); }}
-            onLeave={() => { resetTetrisScore(); leaveRoom(); }}
+            onStartGame={() => { resetMiniGames(); startGame(); }}
+            onLeave={() => { resetMiniGames(); leaveRoom(); }}
           />
         )}
         {phase === "creation" && (
@@ -113,7 +131,10 @@ export default function MemeGame() {
             currentNiche={currentNiche}
             nichePool={nichePool}
             roundStartedAt={roundStartedAt}
-            onLeave={() => { resetTetrisScore(); leaveRoom(); }}
+            onLeave={() => { resetMiniGames(); leaveRoom(); }}
+            duelPlayer={duelPlayer}
+            sendDuelEvent={sendDuelEvent}
+            subscribeDuelEvents={subscribeDuelEvents}
           />
         )}
         {phase === "voting" && submissions.length > 0 && (
@@ -130,7 +151,7 @@ export default function MemeGame() {
             isHost={currentPlayer?.isHost || false}
             onForceAdvance={advanceMeme}
             hasUsedHeart={hasUsedHeart}
-            onLeave={() => { resetTetrisScore(); leaveRoom(); }}
+            onLeave={() => { resetMiniGames(); leaveRoom(); }}
             gameMode={settings.gameMode}
           />
         )}
@@ -155,8 +176,8 @@ export default function MemeGame() {
             roomCode={roomCode}
             players={players}
             playerScores={playerScores}
-            onNewGame={() => { resetTetrisScore(); newGame(); }}
-            onBackToHome={() => { resetTetrisScore(); leaveRoom(); }}
+            onNewGame={() => { resetMiniGames(); newGame(); }}
+            onBackToHome={() => { resetMiniGames(); leaveRoom(); }}
             isHost={currentPlayer?.isHost || false}
             gameMode={settings.gameMode}
             codenames={codenames}

@@ -87,3 +87,24 @@ export interface HeartRedistribution {
   unusedCount: number
   bonuses: Record<string, number> // playerId -> bonus points received from others' unused hearts
 }
+
+// ─── 1v1 Mini-Game Duels (Ephemeral Realtime Broadcast) ───────────────────────
+
+export type DuelKind = "ttt" | "rps"
+export type RpsChoice = "rock" | "paper" | "scissors"
+
+export interface DuelPlayer {
+  id: string
+  name: string
+  avatar: string
+}
+
+export type DuelEvent =
+  | { type: "duel:hello"; playerId: string }
+  | { type: "duel:queue"; player: DuelPlayer; game: DuelKind }
+  | { type: "duel:cancel"; playerId: string }
+  | { type: "duel:accept"; matchId: string; game: DuelKind; host: DuelPlayer; guest: DuelPlayer }
+  | { type: "duel:move"; matchId: string; playerId: string; index: number }
+  | { type: "duel:rps_pick"; matchId: string; playerId: string; round: number; choice: RpsChoice }
+  | { type: "duel:rematch"; matchId: string; playerId: string }
+  | { type: "duel:leave"; matchId: string; playerId: string }

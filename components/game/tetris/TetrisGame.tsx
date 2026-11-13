@@ -307,7 +307,7 @@ export function TetrisGame({ roundNumber = 1 }: TetrisGameProps) {
       </div>
 
       {gameOver && (
-        <div className="absolute inset-0 z-20 bg-background/85 backdrop-blur-md flex flex-col items-center justify-center rounded-xl p-4 text-center animate-in fade-in zoom-in-95 duration-200">
+        <div className="absolute inset-0 z-30 bg-background/85 backdrop-blur-md flex flex-col items-center justify-center rounded-xl p-4 text-center animate-in fade-in zoom-in-95 duration-200">
           <h2 className="text-2xl sm:text-3xl font-black mb-1.5 text-destructive tracking-tight">GAME OVER</h2>
           <div className="bg-card/90 border-2 border-border p-3 rounded-xl mb-4 w-full max-w-xs shadow-md">
             <p className="text-sm font-bold mb-1">
