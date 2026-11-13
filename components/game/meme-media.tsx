@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { VolumeX, Volume2, Play } from "lucide-react"
+import { VolumeX, Volume2, Play, Loader2 } from "lucide-react"
+import { getCachedMediaUrl, isVideoUrl, peekCachedMediaUrl } from "@/lib/media-cache"
 
 interface MemeMediaProps {
   src: string
@@ -11,9 +12,12 @@ interface MemeMediaProps {
 }
 
 export function MemeMedia({ src, alt, className, forceMuted = false }: MemeMediaProps) {
-  const isVideo = /\.(mp4|webm|mov)(\?|$)/i.test(src)
+  const isVideo = isVideoUrl(src)
   const videoRef = useRef<HTMLVideoElement>(null)
-  
+
+  const [resolvedSrc, setResolvedSrc] = useState<string>(() =>
+    isVideo ? (peekCachedMediaUrl(src) ?? "") : src
+  )
   const [playBlocked, setPlayBlocked] = useState(false)
   const [isMuted, setIsMuted] = useState(forceMuted)
   const [volume, setVolume] = useState(0.5)
@@ -24,14 +28,50 @@ export function MemeMedia({ src, alt, className, forceMuted = false }: MemeMedia
     }
   }, [])
 
+  // Resolve video via in-memory Blob cache so loops & remounts consume 0 network egress
+  useEffect(() => {
+    if (!isVideo) {
+      setResolvedSrc(src)
+      return
+    }
+
+    const immediate = peekCachedMediaUrl(src)
+    if (immediate) {
+      setResolvedSrc(immediate)
+      return
+    }
+
+    let cancelled = false
+    setResolvedSrc("")
+    setPlayBlocked(false)
+
+    getCachedMediaUrl(src).then((finalUrl) => {
+      if (!cancelled) {
+        setResolvedSrc(finalUrl)
+      }
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [src, isVideo])
+
+  // Sync volume changes without restarting video playback
   useEffect(() => {
     if (isVideo && videoRef.current) {
+      videoRef.current.volume = volume
+    }
+  }, [isVideo, volume])
+
+  // Start playback only when the resolved video source or mute constraint changes
+  useEffect(() => {
+    if (isVideo && resolvedSrc && videoRef.current) {
       videoRef.current.volume = volume
       if (forceMuted) {
         videoRef.current.muted = true
         setIsMuted(true)
       }
-      
+
       const playPromise = videoRef.current.play()
       if (playPromise !== undefined) {
         playPromise.catch(() => {
@@ -45,7 +85,8 @@ export function MemeMedia({ src, alt, className, forceMuted = false }: MemeMedia
         })
       }
     }
-  }, [src, isVideo, forceMuted, volume])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resolvedSrc, isVideo, forceMuted])
 
   const handleManualPlay = () => {
     if (videoRef.current) {
@@ -83,20 +124,26 @@ export function MemeMedia({ src, alt, className, forceMuted = false }: MemeMedia
   if (isVideo) {
     return (
       <div className={`relative flex items-center justify-center ${className || ''}`}>
-        <video
-          ref={videoRef}
-          src={src}
-          className="max-w-full max-h-full object-contain rounded-md"
-          autoPlay
-          loop
-          playsInline
-          preload="none"
-          muted={forceMuted}
-        />
-        
+        {!resolvedSrc ? (
+          <div className="flex items-center justify-center p-8 text-muted-foreground">
+            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          </div>
+        ) : (
+          <video
+            ref={videoRef}
+            src={resolvedSrc}
+            className="max-w-full max-h-full object-contain rounded-md"
+            autoPlay
+            loop
+            playsInline
+            preload="auto"
+            muted={forceMuted}
+          />
+        )}
+
         {/* Play Overlay if browser blocks autoplay */}
-        {playBlocked && !forceMuted && (
-          <div 
+        {resolvedSrc && playBlocked && !forceMuted && (
+          <div
             className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 rounded-md cursor-pointer backdrop-blur-[2px]"
             onClick={handleManualPlay}
           >
@@ -109,9 +156,9 @@ export function MemeMedia({ src, alt, className, forceMuted = false }: MemeMedia
           </div>
         )}
 
-        {/* Optional: Mute/Unmute toggle button & Volume Slider */}
-        {!playBlocked && !forceMuted && (
-          <div 
+        {/* Mute/Unmute toggle button & Volume Slider */}
+        {resolvedSrc && !playBlocked && !forceMuted && (
+          <div
             className="absolute bottom-2 right-2 flex items-center gap-2 bg-black/60 p-2 rounded-full z-20 hover:bg-black/80 transition-all duration-300 group"
             onClick={(e) => e.stopPropagation()}
           >
@@ -122,10 +169,10 @@ export function MemeMedia({ src, alt, className, forceMuted = false }: MemeMedia
             >
               {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
             </button>
-            <input 
-              type="range" 
-              min="0" max="1" step="0.01" 
-              value={isMuted ? 0 : volume} 
+            <input
+              type="range"
+              min="0" max="1" step="0.01"
+              value={isMuted ? 0 : volume}
               onChange={handleVolumeChange}
               className="w-0 opacity-0 group-hover:w-20 group-hover:opacity-100 transition-all duration-300 accent-white cursor-pointer"
             />
@@ -140,4 +187,3 @@ export function MemeMedia({ src, alt, className, forceMuted = false }: MemeMedia
     <img src={src} alt={alt} className={className} loading="lazy" decoding="async" />
   )
 }
-

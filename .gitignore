@@ -14,6 +14,8 @@ out/
 # Temporary conversion folders & reports
 memes_h264/
 memes_h265/
+memes_optimized/
+memes_raw_compat/
 audit-report.json
 android/
 capacitor.config.ts

@@ -336,6 +336,7 @@ function MemeThumb({
 
 function PackCard({ pack, onUpdated, onDeleted }: { pack: MemePack; onUpdated: () => void; onDeleted: () => void }) {
   const [expanded, setExpanded] = useState(false)
+  const [visibleCount, setVisibleCount] = useState(24)
   const [addUrlsText, setAddUrlsText] = useState("")
   const [addLoading, setAddLoading] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
@@ -584,10 +585,10 @@ function PackCard({ pack, onUpdated, onDeleted }: { pack: MemePack; onUpdated: (
           {pack.memes.length > 0 ? (
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5 mb-2">
-                <ImageIcon className="w-3.5 h-3.5" /> Mèmes ({pack.memes.length})
+                <ImageIcon className="w-3.5 h-3.5" /> Mèmes ({Math.min(visibleCount, pack.memes.length)} / {pack.memes.length})
               </label>
               <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-2">
-                {pack.memes.map((meme, index) => (
+                {pack.memes.slice(0, visibleCount).map((meme, index) => (
                   <MemeThumb
                     key={index}
                     meme={meme}
@@ -597,6 +598,15 @@ function PackCard({ pack, onUpdated, onDeleted }: { pack: MemePack; onUpdated: (
                   />
                 ))}
               </div>
+              {visibleCount < pack.memes.length && (
+                <button
+                  type="button"
+                  onClick={() => setVisibleCount((prev) => prev + 24)}
+                  className="mt-3 w-full py-2 rounded-xl border-2 border-border/60 hover:bg-muted/40 text-xs font-bold text-muted-foreground hover:text-foreground transition-all"
+                >
+                  Charger plus de mèmes ({pack.memes.length - visibleCount} restants)
+                </button>
+              )}
             </div>
           ) : (
             <div className="text-center py-6 text-muted-foreground">

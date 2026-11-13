@@ -6,6 +6,7 @@ import type { RealtimeChannel } from "@supabase/supabase-js"
 import type { Player, Meme, MemePack, MemeLibrary, GamePhase, GameSettings, NichePoolItem } from "@/types/game"
 import { SECRET_CODENAMES } from "@/types/game"
 import { getCachedPacks } from "@/lib/packs-cache"
+import { getCachedMediaUrl } from "@/lib/media-cache"
 import { getApiBase } from "@/lib/utils"
 
 const avatars = ["🎮", "🔥", "👑", "💀", "🚀", "🎲", "🎯", "⚡", "🌟", "🎪", "🦄", "🐉"]
@@ -15,7 +16,7 @@ const DEFAULT_SETTINGS: GameSettings = {
   totalRounds: 5,
   maxPlayers: 8,
   gameMode: "classic",
-  maxRefreshes: 5,
+  maxRefreshes: 3,
 }
 
 function generateRoomCode(): string {
@@ -853,6 +854,15 @@ export function useGameRoom() {
     const timer = setTimeout(() => advanceMeme(), 20000)
     return () => clearTimeout(timer)
   }, [phase, currentPlayer, currentMemeIndex, advanceMeme])
+
+  // Preload the next meme into the in-memory Blob cache during voting
+  useEffect(() => {
+    if (phase !== "voting") return
+    const nextMeme = submissions[currentMemeIndex + 1]
+    if (nextMeme?.imageUrl) {
+      getCachedMediaUrl(nextMeme.imageUrl)
+    }
+  }, [phase, currentMemeIndex, submissions])
 
   const nextRound = useCallback(() => {
     if (!currentPlayer?.isHost || !channelRef.current || !selectedPack) return

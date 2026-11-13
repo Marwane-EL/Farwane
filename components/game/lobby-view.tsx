@@ -368,7 +368,7 @@ export function LobbyView({
                         <span>Changements d&apos;image par manche</span>
                       </div>
                       <div className="flex gap-1.5 items-center">
-                        {[0, 5, 10].map((r) => (
+                        {[0, 3, 5].map((r) => (
                           <Button
                             key={r}
                             type="button"
@@ -396,7 +396,7 @@ export function LobbyView({
                             }}
                             placeholder="Perso"
                             className={`w-full h-7 sm:h-8 px-1 text-center rounded-md border-2 font-black text-xs outline-none transition-all ${
-                              ![0, 5, 10].includes(settings.maxRefreshes)
+                              ![0, 3, 5].includes(settings.maxRefreshes)
                                 ? "border-secondary bg-secondary/15 text-secondary shadow-[2px_2px_0px_oklch(0.85_0.2_90_/_0.5)]"
                                 : "border-border bg-background hover:border-border/80 focus:border-secondary"
                             }`}

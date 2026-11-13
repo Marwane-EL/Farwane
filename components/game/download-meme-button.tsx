@@ -7,6 +7,7 @@ import * as htmlToImage from "html-to-image"
 import type { Meme } from "@/types/game"
 import { toast } from "sonner"
 import { getApiBase } from "@/lib/utils"
+import { peekCachedMediaUrl } from "@/lib/media-cache"
 
 interface DownloadMemeButtonProps {
   meme: Meme
@@ -69,7 +70,8 @@ export function DownloadMemeButton({ meme, className }: DownloadMemeButtonProps)
 
       const isVideo = /\.(mp4|webm|mov)(\?|$)/i.test(meme.imageUrl)
       const apiBase = getApiBase()
-      const proxiedUrl = `${apiBase}/api/proxy?url=${encodeURIComponent(meme.imageUrl)}`
+      const cachedBlobUrl = peekCachedMediaUrl(meme.imageUrl)
+      const proxiedUrl = cachedBlobUrl ?? `${apiBase}/api/proxy?url=${encodeURIComponent(meme.imageUrl)}`
       
       const img = document.createElement("img")
       img.crossOrigin = "anonymous"
