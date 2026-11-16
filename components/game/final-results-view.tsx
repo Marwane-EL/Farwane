@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Trophy, RotateCcw, Home, Sparkles, Crown, Loader2, EyeOff, Heart } from "lucide-react"
 import { RoomCodeBadge } from "@/components/game/room-code-badge"
+import { PlayerAvatar } from "@/components/game/player-avatar"
 import type { Player, GameMode, HeartRedistribution } from "@/types/game"
 
 interface FinalResultsViewProps {
@@ -74,7 +75,9 @@ export function FinalResultsView({
                     </div>
                   )}
                   <Crown className="h-8 w-8 sm:h-10 sm:w-10 text-yellow-400 mx-auto mb-2 animate-bounce" />
-                  <div className="text-4xl sm:text-5xl mb-2">{winner.avatar}</div>
+                  <div className="text-4xl sm:text-5xl mb-2 flex justify-center">
+                    <PlayerAvatar avatar={winner.avatar} imgClassName="w-14 h-14 sm:w-16 sm:h-16 rounded-full object-cover border-2 border-yellow-400" />
+                  </div>
                   <h2 className="text-xl sm:text-3xl font-black text-yellow-400 mb-1 truncate">
                     {winner.pseudo}
                   </h2>
@@ -126,7 +129,7 @@ export function FinalResultsView({
                         style={{ animationDelay: `${(i + 2) * 70}ms` }}
                       >
                         <span className={`text-base sm:text-lg font-black w-6 shrink-0 text-center ${rankColor}`}>{medal}</span>
-                        <span className="text-xl sm:text-2xl shrink-0">{player.avatar}</span>
+                        <PlayerAvatar avatar={player.avatar} className="text-xl sm:text-2xl shrink-0" imgClassName="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover" />
                         <div className="flex-1 min-w-0">
                           <p className="font-bold text-xs sm:text-sm truncate">{player.pseudo}</p>
                         </div>

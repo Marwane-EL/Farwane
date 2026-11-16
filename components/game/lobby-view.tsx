@@ -13,6 +13,7 @@ import {
 import type { Player, MemeLibrary, MemePack, GameSettings, NichePoolItem, NicheItem } from "@/types/game"
 import { getMinNichesRequired } from "@/types/game"
 import { NichePoolLobby } from "@/components/game/niche-pool-lobby"
+import { PlayerAvatar } from "@/components/game/player-avatar"
 
 interface LobbyViewProps {
   roomCode: string
@@ -129,8 +130,8 @@ export function LobbyView({
                         {player.isHost && (
                           <Crown className="absolute -top-2.5 -right-1.5 h-5 w-5 sm:h-6 sm:w-6 text-secondary fill-secondary drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)] animate-bounce z-30 pointer-events-none" />
                         )}
-                        <div className="text-2xl sm:text-3xl mb-1 select-none leading-none">
-                          {player.avatar}
+                        <div className="text-2xl sm:text-3xl mb-1 select-none leading-none flex items-center justify-center">
+                          <PlayerAvatar avatar={player.avatar} imgClassName="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover" />
                         </div>
                         <p className="font-bold text-xs sm:text-sm truncate max-w-full text-center">
                           {player.pseudo}

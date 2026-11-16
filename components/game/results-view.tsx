@@ -2,10 +2,11 @@
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Trophy, Medal, Award, RotateCcw, Home, Sparkles, Loader2, Star, EyeOff } from "lucide-react"
+import { Trophy, Medal, Award, RotateCcw, Home, Sparkles, Loader2, Star, EyeOff, Flame } from "lucide-react"
 import { MemeMedia } from "@/components/game/meme-media"
 import { DownloadMemeButton } from "@/components/game/download-meme-button"
 import { RoomCodeBadge } from "@/components/game/room-code-badge"
+import { PlayerAvatar } from "@/components/game/player-avatar"
 import type { Meme, Player, GameMode } from "@/types/game"
 
 interface ResultsViewProps {
@@ -21,6 +22,10 @@ interface ResultsViewProps {
   gameMode?: GameMode
   codenames?: Record<string, string>
   currentPlayerId?: string
+  isFavoriteMeme?: (url: string) => boolean
+  onToggleFavoriteMeme?: (url: string) => void
+  isSavedBanger?: (imageUrl: string, caption: string) => boolean
+  onToggleSavedBanger?: (input: { imageUrl: string; caption: string; playerPseudo: string; niche?: string }) => void
 }
 
 export function ResultsView({
@@ -31,6 +36,10 @@ export function ResultsView({
   gameMode,
   codenames,
   currentPlayerId,
+  isFavoriteMeme,
+  onToggleFavoriteMeme,
+  isSavedBanger,
+  onToggleSavedBanger,
 }: ResultsViewProps) {
   const isIncognito = gameMode === "incognito"
   const sortedMemes = [...memes].sort((a, b) => b.votes - a.votes)
@@ -119,8 +128,59 @@ export function ResultsView({
               <div key={meme.id} className="flex flex-col items-center flex-1 animate-in fade-in zoom-in-95 duration-500" style={{ animationDelay: `${(visualIndex + 1) * 200}ms` }}>
                 <div className={`w-full border-2 ${config.borderColor} ${config.bgColor} ${config.shadowColor} rounded-lg mb-2 transition-transform hover:-translate-x-[1px] hover:-translate-y-[1px] relative group`}>
                   <div className="p-2 sm:p-3 text-center relative">
-                    <div className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                      <DownloadMemeButton meme={meme} className="h-7 w-7" />
+                    <div className="absolute -top-2 -right-2 flex items-center gap-1 opacity-95 group-hover:opacity-100 transition-opacity z-10">
+                      {onToggleFavoriteMeme && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={() => onToggleFavoriteMeme(meme.imageUrl)}
+                          title="Ajouter à mon pack Mes Favoris"
+                          className={`h-7 w-7 rounded-full shadow-md bg-background/85 backdrop-blur-sm border-2 ${
+                            isFavoriteMeme?.(meme.imageUrl) ? "border-amber-400 text-amber-400" : ""
+                          }`}
+                        >
+                          <Star
+                            className={`h-3.5 w-3.5 ${
+                              isFavoriteMeme?.(meme.imageUrl) ? "fill-amber-400 text-amber-400" : ""
+                            }`}
+                          />
+                        </Button>
+                      )}
+                      {onToggleSavedBanger && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={() =>
+                            onToggleSavedBanger({
+                              imageUrl: meme.imageUrl,
+                              caption: meme.caption,
+                              playerPseudo: isIncognito ? "Anonyme 👻" : meme.playerPseudo,
+                              niche: meme.niche,
+                            })
+                          }
+                          title="Garder ce Banger (Hall of Fame)"
+                          className={`h-7 w-7 rounded-full shadow-md bg-background/85 backdrop-blur-sm border-2 ${
+                            isSavedBanger?.(meme.imageUrl, meme.caption) ? "border-orange-500 text-orange-400" : ""
+                          }`}
+                        >
+                          <Flame
+                            className={`h-3.5 w-3.5 ${
+                              isSavedBanger?.(meme.imageUrl, meme.caption)
+                                ? "fill-orange-400 text-orange-400"
+                                : "text-orange-400"
+                            }`}
+                          />
+                        </Button>
+                      )}
+                      <DownloadMemeButton
+                        meme={{
+                          ...meme,
+                          playerPseudo: isIncognito ? "Anonyme" : meme.playerPseudo,
+                        }}
+                        className="h-7 w-7"
+                      />
                     </div>
                     <div className="w-full aspect-square rounded-md overflow-hidden mb-1.5 bg-muted/50 border border-border/30">
                       <MemeMedia src={meme.imageUrl} alt={`Meme de ${authorDisplayName}`} className="w-full h-full object-cover" forceMuted />
@@ -163,7 +223,7 @@ export function ResultsView({
                       "border-border/40 bg-muted/20"
                     } ${isCurrent && isIncognito ? "ring-2 ring-primary/60 bg-primary/10 border-primary/50" : ""}`}>
                       <span className="text-xs sm:text-sm font-black text-muted-foreground w-5">{i + 1}.</span>
-                      <span className="text-base sm:text-lg">{displayAvatar}</span>
+                      <PlayerAvatar avatar={displayAvatar} className="text-base sm:text-lg" imgClassName="w-6 h-6 rounded-full object-cover" />
                       <span className={`font-bold text-sm flex-1 truncate ${isIncognito && !isCurrent ? "text-muted-foreground tracking-widest font-mono" : ""}`}>
                         {displayName}
                       </span>

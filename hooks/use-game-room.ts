@@ -476,7 +476,15 @@ export function useGameRoom() {
     // Vote received
     channel.on("broadcast", { event: "game:vote" }, ({ payload }) => {
       setSubmissions((prev) =>
-        prev.map((m) => (m.id === payload.memeId ? { ...m, votes: m.votes + payload.score } : m))
+        prev.map((m) =>
+          m.id === payload.memeId
+            ? {
+                ...m,
+                votes: m.votes + payload.score,
+                hearts: (m.hearts || 0) + (payload.isHeart ? 1 : 0),
+              }
+            : m
+        )
       )
       setCurrentVoters((prev) => prev.includes(payload.voterId) ? prev : [...prev, payload.voterId])
       if (payload.isHeart && payload.voterId) {
@@ -649,7 +657,7 @@ export function useGameRoom() {
 
   // --- Actions ---
 
-  const createRoom = useCallback(async (pseudo: string) => {
+  const createRoom = useCallback(async (pseudo: string, preferredAvatar?: string) => {
     setIsLoading(true)
     setError(null)
     sessionStorage.removeItem(SESSION_STORAGE_KEY)
@@ -670,7 +678,7 @@ export function useGameRoom() {
       }
       const player: Player = {
         id: playerIdRef.current, pseudo: pseudo || "Hôte",
-        avatar: getRandomAvatar(), score: 0, isHost: true,
+        avatar: preferredAvatar || getRandomAvatar(), score: 0, isHost: true,
       }
       setCurrentPlayer(player)
       setRoomCode(code)
@@ -684,7 +692,7 @@ export function useGameRoom() {
     }
   }, [subscribeToRoom])
 
-  const joinRoom = useCallback(async (code: string, pseudo: string) => {
+  const joinRoom = useCallback(async (code: string, pseudo: string, preferredAvatar?: string) => {
     setIsLoading(true)
     setError(null)
     try {
@@ -703,7 +711,7 @@ export function useGameRoom() {
       const isHost = data.host_id === playerIdRef.current
       const player: Player = {
         id: playerIdRef.current, pseudo: pseudo.trim(),
-        avatar: getRandomAvatar(), score: 0, isHost,
+        avatar: preferredAvatar || getRandomAvatar(), score: 0, isHost,
       }
       setCurrentPlayer(player)
       setRoomCode(formattedCode)
@@ -790,11 +798,13 @@ export function useGameRoom() {
       playerPseudo: pseudo,
       imageUrl: myMemeUrl,
       caption, votes: 0,
+      niche: currentNiche?.text,
+      hearts: 0,
     }
     setHasSubmitted(true)
     setSubmissions((prev) => [...prev, meme])
     channelRef.current.send({ type: "broadcast", event: "game:submit", payload: { meme } })
-  }, [currentPlayer, myMemeUrl, hasSubmitted, settings.gameMode, codenames])
+  }, [currentPlayer, myMemeUrl, hasSubmitted, settings.gameMode, codenames, currentNiche])
 
   const moveToVoting = useCallback(() => {
     if (!currentPlayer?.isHost || !channelRef.current) return
@@ -826,7 +836,13 @@ export function useGameRoom() {
     
     setCurrentVoters((prev) => prev.includes(currentPlayer.id) ? prev : [...prev, currentPlayer.id])
     if (finalScore > 0) {
-      setSubmissions((prev) => prev.map((m) => (m.id === memeId ? { ...m, votes: m.votes + finalScore } : m)))
+      setSubmissions((prev) =>
+        prev.map((m) =>
+          m.id === memeId
+            ? { ...m, votes: m.votes + finalScore, hearts: (m.hearts || 0) + (usedHeartThisVote ? 1 : 0) }
+            : m
+        )
+      )
     }
     channelRef.current.send({
       type: "broadcast", event: "game:vote",
@@ -1038,6 +1054,9 @@ export function useGameRoom() {
       lib.id === libraryId ? { ...lib, memes: lib.memes.filter((_, i) => i !== memeIndex) } : lib
     ))
   }, [])
+  const hydrateLibraries = useCallback((items: MemeLibrary[]) => {
+    setLibraries(items)
+  }, [])
 
   // Cleanup
   useEffect(() => {
@@ -1163,7 +1182,7 @@ export function useGameRoom() {
     advanceMeme, nextRound, newGame,
     refreshMeme, refreshesLeft,
     setError,
-    createLibrary, deleteLibrary, addMemeToLibrary, removeMemeFromLibrary,
+    createLibrary, deleteLibrary, addMemeToLibrary, removeMemeFromLibrary, hydrateLibraries,
     addNicheToPool, removeNicheFromPool, clearNichePool,
     codenames,
   }

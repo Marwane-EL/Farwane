@@ -43,6 +43,8 @@ export interface Meme {
   imageUrl: string
   caption: string
   votes: number
+  niche?: string
+  hearts?: number
 }
 
 export interface MemeLibrary {
@@ -108,3 +110,33 @@ export type DuelEvent =
   | { type: "duel:rps_pick"; matchId: string; playerId: string; round: number; choice: RpsChoice }
   | { type: "duel:rematch"; matchId: string; playerId: string }
   | { type: "duel:leave"; matchId: string; playerId: string }
+
+// ─── User Account, Favorites & Bangers (Hall of Fame) ─────────────────────────
+
+export interface SavedBanger {
+  id: string
+  imageUrl: string
+  caption: string
+  playerPseudo: string
+  niche?: string
+  createdAt: number
+}
+
+export interface UserStats {
+  gamesPlayed: number
+  wins: number
+  totalPoints: number
+  heartsReceived: number
+}
+
+export interface UserProfile {
+  id: string
+  email?: string
+  pseudo: string
+  avatar: string
+  favoriteMemes: string[]       // Raw media URLs usable as a playable pack ("⭐ Mes Favoris")
+  savedBangers: SavedBanger[]   // Hall of Fame creations (media + caption + author)
+  niches: NicheItem[]
+  libraries: MemeLibrary[]
+  stats: UserStats
+}

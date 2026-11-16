@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { Swords, RotateCcw, LogOut, Loader2, Sparkles } from "lucide-react"
 import type { DuelEvent, DuelKind, DuelPlayer, RpsChoice } from "@/types/game"
+import { PlayerAvatar } from "@/components/game/player-avatar"
 
 interface QueueEntry {
   player: DuelPlayer
@@ -325,8 +326,9 @@ export function DuelGame({ me, sendDuelEvent, subscribeDuelEvents }: DuelGamePro
             <Swords className="w-4 h-4 text-primary" />
             <h3 className="text-sm sm:text-base font-black">Duel 1v1 en attente</h3>
           </div>
-          <span className="text-[11px] font-bold text-muted-foreground">
-            {me.avatar} {me.name}
+          <span className="text-[11px] font-bold text-muted-foreground flex items-center gap-1.5">
+            <PlayerAvatar avatar={me.avatar} imgClassName="w-4 h-4 rounded-full object-cover" />
+            <span>{me.name}</span>
           </span>
         </div>
 
@@ -400,7 +402,7 @@ export function DuelGame({ me, sendDuelEvent, subscribeDuelEvents }: DuelGamePro
                   className="flex items-center justify-between gap-2 p-2.5 rounded-xl border border-border bg-card"
                 >
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-lg shrink-0">{entry.player.avatar}</span>
+                    <PlayerAvatar avatar={entry.player.avatar} className="text-lg shrink-0" imgClassName="w-6 h-6 rounded-full object-cover" />
                     <div className="min-w-0">
                       <div className="text-sm font-bold truncate">{entry.player.name}</div>
                       <div className="text-[11px] text-muted-foreground">
@@ -434,11 +436,15 @@ export function DuelGame({ me, sendDuelEvent, subscribeDuelEvents }: DuelGamePro
       {/* Match Header */}
       <div className="flex items-center justify-between gap-2 mb-2 shrink-0">
         <div className="flex items-center gap-1.5 text-xs font-black min-w-0">
-          <span className="truncate">{me.avatar} Toi</span>
+          <span className="truncate flex items-center gap-1">
+            <PlayerAvatar avatar={me.avatar} imgClassName="w-4 h-4 rounded-full object-cover" /> Toi
+          </span>
           <span className="px-2 py-0.5 rounded-full bg-muted border border-border shrink-0">
             {scores.me} - {scores.opponent}
           </span>
-          <span className="truncate">{match.opponent.avatar} {match.opponent.name}</span>
+          <span className="truncate flex items-center gap-1">
+            <PlayerAvatar avatar={match.opponent.avatar} imgClassName="w-4 h-4 rounded-full object-cover" /> {match.opponent.name}
+          </span>
         </div>
         <button
           type="button"

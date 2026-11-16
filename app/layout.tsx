@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Space_Grotesk } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { Toaster } from 'sonner'
 import './globals.css'
 
 const spaceGrotesk = Space_Grotesk({
@@ -37,6 +38,7 @@ export default function RootLayout({
     <html lang="fr" className="dark">
       <body className={`${spaceGrotesk.className} antialiased`}>
         {children}
+        <Toaster richColors position="top-center" />
         <Analytics />
       </body>
     </html>

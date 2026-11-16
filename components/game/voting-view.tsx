@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Clock, ThumbsDown, Meh, Laugh, Sparkles, Users, SkipForward } from "lucide-react"
+import { Clock, ThumbsDown, Meh, Laugh, Sparkles, Users, SkipForward, Star, Flame } from "lucide-react"
 import { MemeMedia } from "@/components/game/meme-media"
 import { DownloadMemeButton } from "@/components/game/download-meme-button"
 import { LeaveGameButton } from "@/components/game/leave-game-button"
@@ -25,6 +25,10 @@ interface VotingViewProps {
   onLeave?: () => void
   roomCode?: string
   gameMode?: GameMode
+  isFavoriteMeme?: boolean
+  onToggleFavoriteMeme?: (url: string) => void
+  isSavedBanger?: boolean
+  onToggleSavedBanger?: (input: { imageUrl: string; caption: string; playerPseudo: string; niche?: string }) => void
 }
 
 export function VotingView({
@@ -42,6 +46,10 @@ export function VotingView({
   onLeave,
   roomCode,
   gameMode,
+  isFavoriteMeme = false,
+  onToggleFavoriteMeme,
+  isSavedBanger = false,
+  onToggleSavedBanger,
 }: VotingViewProps) {
   const [timeLeft, setTimeLeft] = useState(20)
   const [selectedVote, setSelectedVote] = useState<string | null>(null)
@@ -136,8 +144,50 @@ export function VotingView({
           <div className="flex flex-col items-center w-full h-full max-h-full justify-center gap-1.5 sm:gap-2">
             {/* Meme image */}
             <div className="relative w-full flex-1 min-h-0 flex items-center justify-center bg-muted/20 rounded-lg overflow-hidden border-2 border-border/50 group">
-              <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 sm:opacity-100 transition-opacity">
-                <DownloadMemeButton meme={meme} />
+              <div className="absolute top-2 right-2 z-10 flex items-center gap-1.5 opacity-95 sm:opacity-100 transition-opacity">
+                {onToggleFavoriteMeme && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onToggleFavoriteMeme(meme.imageUrl)}
+                    title={isFavoriteMeme ? "Retirer de mon pack Mes Favoris" : "Ajouter le mème brut à mon pack Mes Favoris"}
+                    className={`h-8 px-2.5 rounded-full shadow-md bg-background/85 backdrop-blur-sm border-2 text-xs font-black ${
+                      isFavoriteMeme ? "border-amber-400 text-amber-400" : ""
+                    }`}
+                  >
+                    <Star className={`h-3.5 w-3.5 mr-1 ${isFavoriteMeme ? "fill-amber-400 text-amber-400" : ""}`} />
+                    <span className="hidden xs:inline">Pack</span>
+                  </Button>
+                )}
+                {onToggleSavedBanger && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      onToggleSavedBanger({
+                        imageUrl: meme.imageUrl,
+                        caption: meme.caption,
+                        playerPseudo: isIncognito ? "Anonyme 👻" : meme.playerPseudo,
+                        niche: meme.niche,
+                      })
+                    }
+                    title={isSavedBanger ? "Retirer des Bangers" : "Sauvegarder ce Banger (mème + légende) dans ton Hall of Fame"}
+                    className={`h-8 px-2.5 rounded-full shadow-md bg-background/85 backdrop-blur-sm border-2 text-xs font-black ${
+                      isSavedBanger ? "border-orange-500 text-orange-400 bg-orange-500/15" : ""
+                    }`}
+                  >
+                    <Flame className={`h-3.5 w-3.5 mr-1 ${isSavedBanger ? "fill-orange-400 text-orange-400" : "text-orange-400"}`} />
+                    <span>Banger</span>
+                  </Button>
+                )}
+                <DownloadMemeButton
+                  meme={{
+                    ...meme,
+                    playerPseudo: isIncognito ? "Anonyme" : meme.playerPseudo,
+                  }}
+                />
               </div>
               <MemeMedia
                 src={meme.imageUrl}

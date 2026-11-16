@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
-import { Clock, Send, CheckCircle, Users, Loader2, RefreshCw } from "lucide-react"
+import { Clock, Send, CheckCircle, Users, Loader2, RefreshCw, Star } from "lucide-react"
 import { MemeMedia } from "@/components/game/meme-media"
 import { PokemonMemory } from "@/components/game/pokemon-memory"
 import { TetrisGame } from "@/components/game/tetris/TetrisGame"
@@ -38,6 +38,8 @@ interface CreationViewProps {
   duelPlayer?: DuelPlayer
   sendDuelEvent?: (event: DuelEvent) => void
   subscribeDuelEvents?: (cb: (event: DuelEvent) => void) => () => void
+  isFavoriteMeme?: boolean
+  onToggleFavoriteMeme?: () => void
 }
 
 export function CreationView({
@@ -61,6 +63,8 @@ export function CreationView({
   duelPlayer,
   sendDuelEvent,
   subscribeDuelEvents,
+  isFavoriteMeme = false,
+  onToggleFavoriteMeme,
 }: CreationViewProps) {
   const [isLotteryActive, setIsLotteryActive] = useState(!!currentNiche && !hasSubmitted)
   const [timeLeft, setTimeLeft] = useState(() => {
@@ -308,17 +312,34 @@ export function CreationView({
           <CardContent className="p-3 sm:p-4 flex flex-col items-center flex-1 min-h-0">
             <div className="w-full flex justify-between items-center mb-2 px-1 shrink-0">
               <p className="text-xs sm:text-sm text-muted-foreground font-bold uppercase tracking-wide">Image imposée :</p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onRefreshMeme}
-                disabled={refreshesLeft <= 0 || hasSubmitted}
-                className="gap-1.5 h-7 px-2 text-xs font-bold"
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Changer</span>
-                <span className="text-muted-foreground">({refreshesLeft})</span>
-              </Button>
+              <div className="flex items-center gap-1.5">
+                {onToggleFavoriteMeme && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={onToggleFavoriteMeme}
+                    title={isFavoriteMeme ? "Retirer de mes favoris" : "Ajouter à mon pack Mes Favoris"}
+                    className={`gap-1 h-7 px-2 text-xs font-bold ${
+                      isFavoriteMeme ? "border-amber-400 bg-amber-400/15 text-amber-400" : ""
+                    }`}
+                  >
+                    <Star className={`h-3.5 w-3.5 ${isFavoriteMeme ? "fill-amber-400 text-amber-400" : ""}`} />
+                    <span className="hidden sm:inline">{isFavoriteMeme ? "Favori" : "Ajouter aux favoris"}</span>
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onRefreshMeme}
+                  disabled={refreshesLeft <= 0 || hasSubmitted}
+                  className="gap-1.5 h-7 px-2 text-xs font-bold"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Changer</span>
+                  <span className="text-muted-foreground">({refreshesLeft})</span>
+                </Button>
+              </div>
             </div>
             <div className="relative w-full flex-1 min-h-0 flex justify-center items-center rounded-lg overflow-hidden bg-muted/20 border-2 border-border/50 p-2">
               <MemeMedia

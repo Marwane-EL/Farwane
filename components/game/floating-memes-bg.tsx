@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import type { CSSProperties } from "react"
 
 interface FloatingItem {
@@ -78,6 +78,7 @@ function randomEdgePoint(edge: number): { x: number; y: number } {
 export function FloatingMemesBg({ memeUrls }: { memeUrls: string[] }) {
   const [items, setItems] = useState<FloatingItem[]>([])
   const [particles, setParticles] = useState<Particle[]>([])
+  const initializedRef = useRef(false)
 
   // Generate particles once on mount (independent of memeUrls)
   useEffect(() => {
@@ -95,9 +96,10 @@ export function FloatingMemesBg({ memeUrls }: { memeUrls: string[] }) {
     setParticles(generated)
   }, [])
 
-  // Pick random memes with random edge-to-edge trajectories
+  // Pick random memes ONCE when memeUrls first arrives so re-renders never mutate trajectories mid-flight
   useEffect(() => {
-    if (!memeUrls || memeUrls.length === 0) return
+    if (initializedRef.current || !memeUrls || memeUrls.length === 0) return
+    initializedRef.current = true
 
     const COUNT = 6
     const imageUrls = memeUrls.filter((u) => !isVideoFile(u))
@@ -108,16 +110,17 @@ export function FloatingMemesBg({ memeUrls }: { memeUrls: string[] }) {
 
     const built: FloatingItem[] = picked.map((url, idx) => {
       const startEdge = idx % 4
-      // Pick an exit edge different from startEdge (prefer opposite or adjacent)
-      const possibleExits = [0, 1, 2, 3].filter((e) => e !== startEdge)
-      const endEdge = possibleExits[Math.floor(Math.random() * possibleExits.length)]
+      // Always exit on the opposite edge (0<->1, 2<->3) so distance is consistent
+      const endEdge = startEdge ^ 1
 
       const start = randomEdgePoint(startEdge)
       const end = randomEdgePoint(endEdge)
-      const midX = Math.round((start.x + end.x) / 2 + randomBetween(-15, 15))
-      const midY = Math.round((start.y + end.y) / 2 + randomBetween(-15, 15))
+      const midX = Math.round((start.x + end.x) / 2 + randomBetween(-8, 8))
+      const midY = Math.round((start.y + end.y) / 2 + randomBetween(-8, 8))
 
-      const duration = randomBetween(20, 32)
+      // Constant calm speed proportional to distance
+      const dist = Math.hypot(end.x - start.x, end.y - start.y)
+      const duration = Math.round(Math.max(28, Math.min(42, dist * 0.25)))
       const delay = -Math.floor((duration / COUNT) * idx)
       const angleDeg = Math.round((Math.atan2(end.y - start.y, end.x - start.x) * 180) / Math.PI)
 

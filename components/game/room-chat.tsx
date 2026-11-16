@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react"
 import { MessageCircle, X, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { PlayerAvatar } from "@/components/game/player-avatar"
 import type { ChatMessage } from "@/types/game"
 
 interface RoomChatProps {
@@ -109,7 +110,7 @@ export function RoomChat({ messages, currentPlayerId, onSendMessage }: RoomChatP
                     className={`flex flex-col ${isMine ? "items-end" : "items-start"}`}
                   >
                     <div className="flex items-center gap-1 mb-0.5 px-1">
-                      <span className="text-xs">{msg.avatar}</span>
+                      <PlayerAvatar avatar={msg.avatar} className="text-xs" imgClassName="w-4 h-4 rounded-full object-cover" />
                       <span className="text-[10px] font-black text-muted-foreground">
                         {isMine ? "Toi" : msg.pseudo}
                       </span>

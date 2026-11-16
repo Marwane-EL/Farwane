@@ -18,11 +18,15 @@ import {
   AlertCircle,
   Loader2,
   Package,
-  Palette
+  Palette,
+  Flame,
+  Star,
+  User as UserIcon,
 } from "lucide-react"
-import type { MemeLibrary } from "@/types/game"
+import type { MemeLibrary, NicheItem, UserProfile } from "@/types/game"
 import { NicheLibraryPanel } from "@/components/game/niche-library-panel"
 import { FloatingMemesBg } from "@/components/game/floating-memes-bg"
+import { PlayerAvatar } from "@/components/game/player-avatar"
 import { useNicheLibrary } from "@/hooks/use-niche-library"
 
 interface HomeViewProps {
@@ -37,6 +41,13 @@ interface HomeViewProps {
   onAddMemeToLibrary: (libraryId: string, url: string) => void
   onRemoveMemeFromLibrary: (libraryId: string, memeIndex: number) => void
   memeUrls?: string[]
+  profile?: UserProfile | null
+  onOpenAuth?: () => void
+  onOpenProfile?: (tab: "bangers" | "favorites" | "profile") => void
+  externalNiches?: NicheItem[]
+  onAddExternalNiche?: (text: string) => void
+  onEditExternalNiche?: (id: string, text: string) => void
+  onDeleteExternalNiche?: (id: string) => void
 }
 
 export function HomeView({
@@ -51,6 +62,13 @@ export function HomeView({
   onAddMemeToLibrary,
   onRemoveMemeFromLibrary,
   memeUrls = [],
+  profile,
+  onOpenAuth,
+  onOpenProfile,
+  externalNiches,
+  onAddExternalNiche,
+  onEditExternalNiche,
+  onDeleteExternalNiche,
 }: HomeViewProps) {
   const [joinCode, setJoinCode] = useState("")
   const [pseudo, setPseudo] = useState("")
@@ -74,7 +92,19 @@ export function HomeView({
     }
   }, [])
 
-  const { niches, addNiche, editNiche, deleteNiche } = useNicheLibrary()
+  const localNicheHook = useNicheLibrary()
+  const niches = externalNiches ?? localNicheHook.niches
+  const addNiche = onAddExternalNiche ?? localNicheHook.addNiche
+  const editNiche = onEditExternalNiche ?? localNicheHook.editNiche
+  const deleteNiche = onDeleteExternalNiche ?? localNicheHook.deleteNiche
+
+  // Auto-fill pseudo from logged-in account
+  useEffect(() => {
+    if (profile?.pseudo) {
+      setHostPseudo((prev) => prev || profile.pseudo)
+      setPseudo((prev) => prev || profile.pseudo)
+    }
+  }, [profile?.pseudo])
 
   const handleJoin = (e: React.FormEvent) => {
     e.preventDefault()
@@ -112,10 +142,51 @@ export function HomeView({
       <FloatingMemesBg memeUrls={memeUrls} />
 
       {/* Scrollable inner zone on very small screens, top-aligned logo + centered wide cards on desktop */}
-      <div className="relative z-10 flex-1 w-full overflow-y-auto flex flex-col items-center justify-start px-4 sm:px-8 lg:px-12 pt-5 sm:pt-9 pb-4">
+      <div className="relative z-10 flex-1 w-full overflow-y-auto flex flex-col items-center justify-start px-4 sm:px-8 lg:px-12 pt-4 sm:pt-6 pb-4">
+
+        {/* Top Account Bar */}
+        <div className="w-full max-w-7xl flex items-center justify-end gap-2 mb-2 shrink-0">
+          {profile ? (
+            <>
+              <button
+                type="button"
+                onClick={() => onOpenProfile?.("bangers")}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border-2 border-amber-500/50 bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 text-xs font-black transition-all"
+              >
+                <Flame className="w-3.5 h-3.5" />
+                <span>Bangers ({profile.savedBangers.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onOpenProfile?.("favorites")}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border-2 border-primary/50 bg-primary/15 hover:bg-primary/25 text-primary text-xs font-black transition-all"
+              >
+                <Star className="w-3.5 h-3.5" />
+                <span>Favoris ({profile.favoriteMemes.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onOpenProfile?.("profile")}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl border-2 border-border bg-card hover:bg-muted text-xs font-black transition-all shadow-[2px_2px_0px_var(--border)]"
+              >
+                <PlayerAvatar avatar={profile.avatar} className="text-base leading-none" imgClassName="w-5 h-5 rounded-full object-cover" />
+                <span>{profile.pseudo}</span>
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={onOpenAuth}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl border-2 border-primary/60 bg-primary/15 hover:bg-primary/25 text-primary text-xs sm:text-sm font-black transition-all shadow-[3px_3px_0px_oklch(0.75_0.25_300_/_0.4)]"
+            >
+              <UserIcon className="w-4 h-4" />
+              <span>Se connecter / Créer un compte</span>
+            </button>
+          )}
+        </div>
 
         {/* Logo */}
-        <div className="text-center mb-6 sm:mb-10 shrink-0 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="text-center mb-5 sm:mb-8 shrink-0 animate-in fade-in slide-in-from-bottom-4 duration-700">
           <div className="relative inline-flex items-center justify-center gap-3 sm:gap-4">
             <img src="/farwaneLogo.png" alt="FarWane" className="w-12 h-12 sm:w-16 sm:h-16 object-contain drop-shadow-xl" />
             <div>
