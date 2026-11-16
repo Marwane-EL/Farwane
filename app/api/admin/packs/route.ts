@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { normalizeMemeUrls } from "@/lib/utils"
 
-export const dynamic = "force-static"
+export const dynamic = "force-dynamic"
 
 // Server-side Supabase client using service role for admin operations
 function getAdminClient() {

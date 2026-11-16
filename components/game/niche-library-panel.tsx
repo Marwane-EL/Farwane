@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Plus, Trash2, Pencil, Check, X, BookOpen, ChevronDown, ChevronUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { NicheItem } from "@/types/game"
@@ -17,6 +17,12 @@ export function NicheLibraryPanel({ niches, onAdd, onEdit, onDelete }: NicheLibr
   const [input, setInput] = useState("")
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editText, setEditText] = useState("")
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.innerWidth >= 768) {
+      setOpen(true)
+    }
+  }, [])
 
   const handleAdd = () => {
     if (!input.trim()) return

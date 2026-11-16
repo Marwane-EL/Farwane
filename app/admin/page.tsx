@@ -1,10 +1,11 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
+import NextLink from "next/link"
 import {
   Shield, LogOut, Plus, Trash2, ChevronDown, ChevronUp,
   Eye, EyeOff, Package, ImageIcon, X, Loader2,
-  Upload, Sparkles, Check, AlertCircle, RefreshCw, Link, Copy, Wand2
+  Upload, Sparkles, Check, AlertCircle, RefreshCw, Link, Copy, Wand2, Home
 } from "lucide-react"
 import { getApiBase } from "@/lib/utils"
 
@@ -18,10 +19,41 @@ interface MemePack {
   created_at: string
 }
 
-// ─── API helpers (all requests carry the admin token) ─────────────────────────
+// ─── API helpers (all requests carry the admin token with 24h TTL) ───────────
+
+const ADMIN_STORAGE_KEY = "farwane_admin_session"
+const ADMIN_SESSION_TTL_MS = 24 * 60 * 60 * 1000 // 24 heures
+
+function getStoredAdminToken(): string | null {
+  if (typeof window === "undefined") return null
+  try {
+    const raw = localStorage.getItem(ADMIN_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as { token?: string; expiresAt?: number }
+    if (!parsed.token || !parsed.expiresAt || Date.now() > parsed.expiresAt) {
+      localStorage.removeItem(ADMIN_STORAGE_KEY)
+      return null
+    }
+    return parsed.token
+  } catch {
+    localStorage.removeItem(ADMIN_STORAGE_KEY)
+    return null
+  }
+}
+
+function setStoredAdminToken(token: string) {
+  localStorage.setItem(
+    ADMIN_STORAGE_KEY,
+    JSON.stringify({ token, expiresAt: Date.now() + ADMIN_SESSION_TTL_MS })
+  )
+}
+
+function clearStoredAdminToken() {
+  localStorage.removeItem(ADMIN_STORAGE_KEY)
+}
 
 function adminFetch(url: string, options: RequestInit = {}) {
-  const token = sessionStorage.getItem("admin_token") ?? ""
+  const token = getStoredAdminToken() ?? ""
   return fetch(`${getApiBase()}${url}`, {
     ...options,
     headers: {
@@ -52,7 +84,7 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
       })
       const data = await res.json()
       if (data.ok) {
-        sessionStorage.setItem("admin_token", password)
+        setStoredAdminToken(password)
         onLogin()
       } else {
         setError(data.error ?? "Mot de passe incorrect")
@@ -124,6 +156,16 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
               {loading ? "Vérification..." : "Accéder au panel"}
             </button>
           </form>
+
+          <div className="mt-4 pt-3 border-t border-border/40 text-center">
+            <NextLink
+              href="/"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Home className="w-3.5 h-3.5" />
+              Retour à l&apos;accueil
+            </NextLink>
+          </div>
         </div>
       </div>
     </div>
@@ -244,7 +286,30 @@ function MemeThumb({
   const [broken, setBroken] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [inView, setInView] = useState(false)
+  const containerRef = useRef<HTMLDivElement | null>(null)
   const isVideo = /\.(mp4|webm|mov)(\?|$)/i.test(meme)
+
+  useEffect(() => {
+    setBroken(false)
+    setLoaded(false)
+  }, [meme])
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setInView(true)
+          observer.disconnect()
+        }
+      },
+      { rootMargin: "120px" }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -254,7 +319,7 @@ function MemeThumb({
   }
 
   return (
-    <div className={`relative group aspect-square rounded-lg overflow-hidden bg-muted/40 border ${broken ? "border-destructive/60" : "border-border/40"}`}>
+    <div ref={containerRef} className={`relative group aspect-square rounded-lg overflow-hidden bg-muted/40 border ${broken ? "border-destructive/60" : "border-border/40"}`}>
 
       {/* Shimmer skeleton — visible until media is ready */}
       {!loaded && !broken && (
@@ -262,19 +327,19 @@ function MemeThumb({
       )}
 
       {isVideo ? (
-        // preload="metadata" fetches only the container header (a few KB).
-        // Setting currentTime=0.1 on loadedmetadata renders the first frame
-        // without ever starting playback → real thumbnail, minimal bandwidth.
-        <video
-          src={meme}
-          className="w-full h-full object-cover"
-          muted
-          playsInline
-          preload="metadata"
-          onLoadedMetadata={(e) => { (e.target as HTMLVideoElement).currentTime = 0.1 }}
-          onSeeked={() => setLoaded(true)}
-          onError={() => { setBroken(true); setLoaded(true) }}
-        />
+        inView ? (
+          // Media fragment #t=0.1 renders the first frame without a second Range seek request
+          <video
+            src={`${meme}#t=0.1`}
+            className="w-full h-full object-cover"
+            muted
+            playsInline
+            preload="metadata"
+            onLoadedData={() => setLoaded(true)}
+            onLoadedMetadata={() => setLoaded(true)}
+            onError={() => { setBroken(true); setLoaded(true) }}
+          />
+        ) : null
       ) : (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -342,6 +407,9 @@ function PackCard({ pack, onUpdated, onDeleted }: { pack: MemePack; onUpdated: (
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [fixLoading, setFixLoading] = useState(false)
   const [fixProgress, setFixProgress] = useState<{ processed: number; total: number } | null>(null)
+  const [cleanupLoading, setCleanupLoading] = useState(false)
+  const [cleanupProgress, setCleanupProgress] = useState<{ processed: number; total: number } | null>(null)
+  const [dedupeLoading, setDedupeLoading] = useState(false)
   const [removingIndex, setRemovingIndex] = useState<number | null>(null)
   const [feedback, setFeedback] = useState<{ type: "ok" | "err"; msg: string } | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -362,8 +430,16 @@ function PackCard({ pack, onUpdated, onDeleted }: { pack: MemePack; onUpdated: (
         body: JSON.stringify({ memes }),
       })
       if (res.ok) {
+        const d = await res.json()
         setAddUrlsText("")
-        showFeedback("ok", `${memes.length} mème(s) ajouté(s) !`)
+        const added = typeof d.addedCount === "number" ? d.addedCount : memes.length
+        const skipped = typeof d.skippedDuplicates === "number" ? d.skippedDuplicates : 0
+        showFeedback(
+          "ok",
+          skipped > 0
+            ? `${added} mème(s) ajouté(s), ${skipped} doublon(s) ignoré(s)`
+            : `${added} mème(s) ajouté(s) !`
+        )
         onUpdated()
       } else {
         const d = await res.json()
@@ -403,11 +479,16 @@ function PackCard({ pack, onUpdated, onDeleted }: { pack: MemePack; onUpdated: (
     }
   }
 
-  const handleFixUrls = async () => {
-    setFixLoading(true)
-    setFixProgress({ processed: 0, total: pack.memes.length })
+  const runPackSseAction = async (
+    endpoint: string,
+    setLoading: (v: boolean) => void,
+    setProgress: (v: { processed: number; total: number } | null) => void,
+    onDone: (evt: Record<string, unknown>) => void
+  ) => {
+    setLoading(true)
+    setProgress({ processed: 0, total: pack.memes.length })
     try {
-      const res = await adminFetch(`/api/admin/packs/fix?id=${pack.id}`, { method: "POST" })
+      const res = await adminFetch(endpoint, { method: "POST" })
       if (!res.ok || !res.body) {
         showFeedback("err", "Erreur de connexion au serveur")
         return
@@ -422,21 +503,20 @@ function PackCard({ pack, onUpdated, onDeleted }: { pack: MemePack; onUpdated: (
         if (done) break
         buffer += decoder.decode(value, { stream: true })
 
-        // Parse SSE lines
         const lines = buffer.split("\n")
         buffer = lines.pop() ?? ""
 
         for (const line of lines) {
           if (!line.startsWith("data: ")) continue
           try {
-            const evt = JSON.parse(line.slice(6))
-            if (evt.error) {
+            const evt = JSON.parse(line.slice(6)) as Record<string, unknown>
+            if (typeof evt.error === "string") {
               showFeedback("err", evt.error)
             } else if (evt.done) {
-              showFeedback("ok", evt.fixedCount > 0 ? `${evt.fixedCount} URL(s) réparée(s) !` : "Aucune URL à réparer")
+              onDone(evt)
               onUpdated()
-            } else if (typeof evt.processed === "number") {
-              setFixProgress({ processed: evt.processed, total: evt.total })
+            } else if (typeof evt.processed === "number" && typeof evt.total === "number") {
+              setProgress({ processed: evt.processed, total: evt.total })
             }
           } catch { /* malformed line, skip */ }
         }
@@ -444,8 +524,58 @@ function PackCard({ pack, onUpdated, onDeleted }: { pack: MemePack; onUpdated: (
     } catch {
       showFeedback("err", "Erreur réseau")
     } finally {
-      setFixLoading(false)
-      setFixProgress(null)
+      setLoading(false)
+      setProgress(null)
+    }
+  }
+
+  const handleFixUrls = () =>
+    runPackSseAction(
+      `/api/admin/packs/fix?id=${pack.id}`,
+      setFixLoading,
+      setFixProgress,
+      (evt) => {
+        const fixedCount = Number(evt.fixedCount ?? 0)
+        showFeedback("ok", fixedCount > 0 ? `${fixedCount} URL(s) réparée(s) !` : "Aucune URL à réparer")
+      }
+    )
+
+  const handleCleanupUrls = () =>
+    runPackSseAction(
+      `/api/admin/packs/cleanup?id=${pack.id}`,
+      setCleanupLoading,
+      setCleanupProgress,
+      (evt) => {
+        const removedCount = Number(evt.removedCount ?? 0)
+        showFeedback(
+          "ok",
+          removedCount > 0
+            ? `${removedCount} mème(s) avec URL invalide supprimé(s) !`
+            : "Toutes les URLs sont valides !"
+        )
+      }
+    )
+
+  const handleDedupeUrls = async () => {
+    setDedupeLoading(true)
+    try {
+      const res = await adminFetch(`/api/admin/packs/dedupe?id=${pack.id}`, { method: "POST" })
+      const d = await res.json()
+      if (!res.ok) {
+        showFeedback("err", d.error ?? "Erreur")
+        return
+      }
+      const removedCount = Number(d.removedCount ?? 0)
+      if (removedCount > 0) {
+        showFeedback("ok", `${removedCount} doublon(s) supprimé(s) !`)
+        onUpdated()
+      } else {
+        showFeedback("ok", "Aucun doublon détecté !")
+      }
+    } catch {
+      showFeedback("err", "Erreur réseau")
+    } finally {
+      setDedupeLoading(false)
     }
   }
 
@@ -521,35 +651,66 @@ function PackCard({ pack, onUpdated, onDeleted }: { pack: MemePack; onUpdated: (
       {expanded && (
         <div className="border-t border-border/40 px-5 py-4 space-y-5">
 
-          {/* ── Réparer les URLs ─────────────────────────────── */}
+          {/* ── Réparer, Nettoyer & Dédoublonner les URLs ───── */}
           <div className="flex flex-col gap-2">
-            <button
-              type="button"
-              onClick={handleFixUrls}
-              disabled={fixLoading}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-accent/40 bg-accent/10 text-accent hover:bg-accent/20 hover:border-accent/60 disabled:opacity-60 disabled:cursor-not-allowed transition-all text-sm font-bold w-full justify-center"
-            >
-              {fixLoading
-                ? <Loader2 className="w-4 h-4 animate-spin" />
-                : <Wand2 className="w-4 h-4" />
-              }
-              {fixLoading ? "Réparation en cours..." : "Réparer les URLs"}
-            </button>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={handleFixUrls}
+                disabled={fixLoading || cleanupLoading || dedupeLoading}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-accent/40 bg-accent/10 text-accent hover:bg-accent/20 hover:border-accent/60 disabled:opacity-60 disabled:cursor-not-allowed transition-all text-sm font-bold w-full justify-center"
+              >
+                {fixLoading
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : <Wand2 className="w-4 h-4" />
+                }
+                {fixLoading ? "Réparation..." : "Réparer les URLs"}
+              </button>
 
-            {/* Progress bar — visible during fix */}
-            {fixProgress && (
-              <div className="space-y-1">
-                <div className="h-2 w-full rounded-full bg-muted/50 overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-accent to-primary transition-all duration-300"
-                    style={{ width: `${fixProgress.total > 0 ? Math.round((fixProgress.processed / fixProgress.total) * 100) : 0}%` }}
-                  />
+              <button
+                type="button"
+                onClick={handleCleanupUrls}
+                disabled={cleanupLoading || fixLoading || dedupeLoading}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-destructive/40 bg-destructive/10 text-destructive hover:bg-destructive/20 hover:border-destructive/60 disabled:opacity-60 disabled:cursor-not-allowed transition-all text-sm font-bold w-full justify-center"
+              >
+                {cleanupLoading
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : <Trash2 className="w-4 h-4" />
+                }
+                {cleanupLoading ? "Vérification..." : "Nettoyer URLs invalides"}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDedupeUrls}
+                disabled={dedupeLoading || fixLoading || cleanupLoading}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-primary/40 bg-primary/10 text-primary hover:bg-primary/20 hover:border-primary/60 disabled:opacity-60 disabled:cursor-not-allowed transition-all text-sm font-bold w-full justify-center"
+              >
+                {dedupeLoading
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : <Copy className="w-4 h-4" />
+                }
+                {dedupeLoading ? "Analyse..." : "Vérifier doublons"}
+              </button>
+            </div>
+
+            {/* Progress bar — visible during fix or cleanup */}
+            {(fixProgress || cleanupProgress) && (() => {
+              const activeProgress = fixProgress ?? cleanupProgress!
+              return (
+                <div className="space-y-1">
+                  <div className="h-2 w-full rounded-full bg-muted/50 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-accent to-primary transition-all duration-300"
+                      style={{ width: `${activeProgress.total > 0 ? Math.round((activeProgress.processed / activeProgress.total) * 100) : 0}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-muted-foreground text-center">
+                    {activeProgress.processed} / {activeProgress.total} URL{activeProgress.total > 1 ? "s" : ""} vérifiées
+                  </p>
                 </div>
-                <p className="text-[10px] text-muted-foreground text-center">
-                  {fixProgress.processed} / {fixProgress.total} URL{fixProgress.total > 1 ? "s" : ""} analysées
-                </p>
-              </div>
-            )}
+              )
+            })()}
           </div>
 
           {/* Add memes */}
@@ -669,6 +830,13 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <NextLink
+              href="/"
+              className="flex items-center gap-2 px-3 py-2 rounded-xl border-2 border-border/50 hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-all text-sm font-medium"
+            >
+              <Home className="w-4 h-4" />
+              <span className="hidden sm:inline">Accueil</span>
+            </NextLink>
             <button
               onClick={loadPacks}
               className="p-2 rounded-xl border-2 border-border/50 hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-all"
@@ -769,13 +937,13 @@ export default function AdminPage() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null)
 
   useEffect(() => {
-    const token = sessionStorage.getItem("admin_token")
+    const token = getStoredAdminToken()
     setAuthenticated(!!token)
   }, [])
 
   const handleLogin = () => setAuthenticated(true)
   const handleLogout = () => {
-    sessionStorage.removeItem("admin_token")
+    clearStoredAdminToken()
     setAuthenticated(false)
   }
 

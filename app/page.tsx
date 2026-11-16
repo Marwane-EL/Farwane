@@ -88,6 +88,7 @@ export default function MemeGame() {
             onDeleteLibrary={deleteLibrary}
             onAddMemeToLibrary={addMemeToLibrary}
             onRemoveMemeFromLibrary={removeMemeFromLibrary}
+            memeUrls={memePacks.flatMap((p) => p.memes)}
           />
         )}
         {phase === "lobby" && (

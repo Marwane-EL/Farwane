@@ -1,8 +1,9 @@
-﻿import { NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { normalizeMemeUrls } from "@/lib/utils"
+import { dedupeMemeUrls } from "@/lib/meme-dedupe"
 
-export const dynamic = "force-static"
+export const dynamic = "force-dynamic"
 
 function getAdminClient() {
   return createClient(
@@ -40,8 +41,12 @@ export async function POST(req: Request) {
 
   if (fetchErr || !pack) return NextResponse.json({ error: "Pack not found" }, { status: 404 })
 
+  const existingMemes = (pack.memes as string[]) ?? []
   const normalizedMemes = await normalizeMemeUrls(memes)
-  const updatedMemes = [...(pack.memes as string[]), ...normalizedMemes]
+  const { unique: updatedMemes } = dedupeMemeUrls([...existingMemes, ...normalizedMemes])
+  const addedCount = updatedMemes.length - existingMemes.length
+  const skippedDuplicates = normalizedMemes.length - addedCount
+
   const { data, error } = await supabase
     .from("meme_packs")
     .update({ memes: updatedMemes })
@@ -50,7 +55,7 @@ export async function POST(req: Request) {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ pack: data })
+  return NextResponse.json({ pack: data, addedCount, skippedDuplicates })
 }
 
 // DELETE /api/admin/packs/memes?id=PACK_ID&index=N — remove one meme by index

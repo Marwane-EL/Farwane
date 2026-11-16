@@ -409,3 +409,46 @@
   background-color: rgba(128, 128, 128, 0.5);
   border: 1px solid black;
 }
+
+/* ==========================================
+   FLOATING MEMES & PARTICLES BACKGROUND (HOME)
+   ========================================== */
+@keyframes float-random {
+  0% {
+    transform: translate3d(var(--start-x, -20vw), var(--start-y, 20vh), 0);
+  }
+  50% {
+    transform: translate3d(var(--mid-x, 50vw), var(--mid-y, 50vh), 0);
+  }
+  100% {
+    transform: translate3d(var(--end-x, 120vw), var(--end-y, 80vh), 0);
+  }
+}
+
+@keyframes rocket-spark {
+  0% {
+    transform: translate3d(46px, 0, 0) scale(1);
+    opacity: 0.95;
+  }
+  100% {
+    transform: translate3d(var(--spark-dist, 165px), var(--spark-spread, 0px), 0) scale(0.15);
+    opacity: 0;
+  }
+}
+
+@keyframes particle-drift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(0.8);
+    opacity: 0;
+  }
+  20% {
+    opacity: var(--p-opacity, 0.5);
+  }
+  80% {
+    opacity: var(--p-opacity, 0.5);
+  }
+  100% {
+    transform: translate3d(var(--p-dx, 40px), var(--p-dy, -140px), 0) scale(1.2);
+    opacity: 0;
+  }
+}
