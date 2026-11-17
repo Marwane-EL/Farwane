@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FarWane</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: #0d0b14;
+        color: #f8fafc;
+        font-family: system-ui, -apple-system, sans-serif;
+        text-align: center;
+        padding: 24px;
+      }
+      .logo {
+        font-size: 48px;
+        font-weight: 900;
+        letter-spacing: -0.03em;
+        background: linear-gradient(90deg, #c084fc, #facc15, #4ade80);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 12px;
+      }
+      .status {
+        font-size: 14px;
+        color: #a1a1aa;
+        margin-bottom: 20px;
+      }
+      .spinner {
+        width: 32px;
+        height: 32px;
+        border: 3px solid rgba(192, 132, 252, 0.25);
+        border-top-color: #c084fc;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        margin: 0 auto 16px;
+      }
+      button {
+        display: none;
+        padding: 10px 22px;
+        border-radius: 12px;
+        border: 2px solid #c084fc;
+        background: rgba(192, 132, 252, 0.15);
+        color: #fff;
+        font-weight: 800;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      button:hover { background: rgba(192, 132, 252, 0.3); }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+  </head>
+  <body>
+    <div class="logo">FarWane</div>
+    <div id="spinner" class="spinner"></div>
+    <p id="status" class="status">Connexion au serveur...</p>
+    <button id="retry" onclick="connect()">Réessayer</button>
+
+    <script>
+      const TARGET_URL = "https://farwane.netlify.app";
+
+      function connect() {
+        const spinner = document.getElementById("spinner");
+        const status = document.getElementById("status");
+        const retry = document.getElementById("retry");
+
+        spinner.style.display = "block";
+        retry.style.display = "none";
+        status.textContent = "Connexion au serveur...";
+
+        if (!navigator.onLine) {
+          spinner.style.display = "none";
+          retry.style.display = "inline-block";
+          status.textContent = "Connexion Internet requise pour jouer à FarWane.";
+          return;
+        }
+
+        window.location.replace(TARGET_URL);
+      }
+
+      connect();
+    </script>
+  </body>
+</html>
