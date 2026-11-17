@@ -5,7 +5,14 @@
   "windows": [
     "main"
   ],
+  "remote": {
+    "urls": [
+      "https://farwane.netlify.app/*"
+    ]
+  },
   "permissions": [
-    "core:default"
+    "core:default",
+    "core:window:allow-set-fullscreen",
+    "core:window:allow-is-fullscreen"
   ]
 }

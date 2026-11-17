@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
@@ -463,6 +464,17 @@ export function HomeView({
           </div>
 
         </div>
+
+        {/* Discreet legal footer links (required for Steam / Store) */}
+        <footer className="w-full max-w-7xl pt-2 flex items-center justify-center gap-4 text-[11px] text-muted-foreground/70 shrink-0">
+          <Link href="/privacy" className="hover:text-foreground transition-colors">
+            Confidentialité
+          </Link>
+          <span>·</span>
+          <Link href="/terms" className="hover:text-foreground transition-colors">
+            Conditions d&apos;utilisation
+          </Link>
+        </footer>
 
       </div>
     </div>
