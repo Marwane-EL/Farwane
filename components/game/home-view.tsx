@@ -23,11 +23,12 @@ import {
   Flame,
   Star,
   User as UserIcon,
+  HelpCircle,
 } from "lucide-react"
 import type { MemeLibrary, NicheItem, UserProfile } from "@/types/game"
 import { NicheLibraryPanel } from "@/components/game/niche-library-panel"
-import { FloatingMemesBg } from "@/components/game/floating-memes-bg"
 import { PlayerAvatar } from "@/components/game/player-avatar"
+import { HowToPlayModal } from "@/components/game/how-to-play-modal"
 import { useNicheLibrary } from "@/hooks/use-niche-library"
 
 interface HomeViewProps {
@@ -78,6 +79,7 @@ export function HomeView({
   const [newLibraryName, setNewLibraryName] = useState("")
   const [expandedLibrary, setExpandedLibrary] = useState<string | null>(null)
   const [newMemeUrl, setNewMemeUrl] = useState("")
+  const [showHowToPlay, setShowHowToPlay] = useState(false)
 
   // Pre-fill room code from URL query parameter & expand panels on desktop
   useEffect(() => {
@@ -139,14 +141,21 @@ export function HomeView({
 
   return (
     <div className="h-full w-full flex flex-col items-center overflow-hidden relative">
-      {/* Floating random memes/GIFs drifting across the background */}
-      <FloatingMemesBg memeUrls={memeUrls} />
-
       {/* Scrollable inner zone on very small screens, top-aligned logo + centered wide cards on desktop */}
       <div className="relative z-10 flex-1 w-full overflow-y-auto flex flex-col items-center justify-start px-4 sm:px-8 lg:px-12 pt-4 sm:pt-6 pb-4">
 
-        {/* Top Account Bar */}
-        <div className="w-full max-w-7xl flex items-center justify-end gap-2 mb-2 shrink-0">
+        {/* Top Bar: How to play + Account */}
+        <div className="w-full max-w-7xl flex items-center justify-between gap-2 mb-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => setShowHowToPlay(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border-2 border-border bg-card/80 hover:bg-muted text-muted-foreground hover:text-foreground text-xs font-black transition-all shadow-[2px_2px_0px_var(--border)]"
+          >
+            <HelpCircle className="w-3.5 h-3.5 text-primary" />
+            <span>Comment jouer ?</span>
+          </button>
+
+          <div className="flex items-center gap-2">
           {profile ? (
             <>
               <button
@@ -184,6 +193,7 @@ export function HomeView({
               <span>Se connecter / Créer un compte</span>
             </button>
           )}
+          </div>
         </div>
 
         {/* Logo */}
@@ -475,6 +485,8 @@ export function HomeView({
             Conditions d&apos;utilisation
           </Link>
         </footer>
+
+        <HowToPlayModal open={showHowToPlay} onClose={() => setShowHowToPlay(false)} />
 
       </div>
     </div>

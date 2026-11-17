@@ -1,14 +1,19 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { createPortal } from "react-dom"
+import type { CSSProperties } from "react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
-import { Clock, ThumbsDown, Meh, Laugh, Sparkles, Users, SkipForward, Star, Flame } from "lucide-react"
+import { Clock, ThumbsDown, Meh, Laugh, Sparkles, Users, SkipForward, Star, Flame, Send, SmilePlus } from "lucide-react"
 import { MemeMedia } from "@/components/game/meme-media"
 import { DownloadMemeButton } from "@/components/game/download-meme-button"
 import { LeaveGameButton } from "@/components/game/leave-game-button"
 import { RoomCodeBadge } from "@/components/game/room-code-badge"
-import type { Meme, GameMode } from "@/types/game"
+import type { Meme, GameMode, LiveReaction } from "@/types/game"
+
+const QUICK_VOTE_EMOJIS = ["😂", "💀", "🔥", "😭", "🤯", "👑"]
 
 interface VotingViewProps {
   meme: Meme
@@ -29,6 +34,8 @@ interface VotingViewProps {
   onToggleFavoriteMeme?: (url: string) => void
   isSavedBanger?: boolean
   onToggleSavedBanger?: (input: { imageUrl: string; caption: string; playerPseudo: string; niche?: string }) => void
+  onSendReaction?: (kind: "emoji" | "text", content: string) => void
+  subscribeReactions?: (cb: (reaction: LiveReaction) => void) => () => void
 }
 
 export function VotingView({
@@ -50,9 +57,33 @@ export function VotingView({
   onToggleFavoriteMeme,
   isSavedBanger = false,
   onToggleSavedBanger,
+  onSendReaction,
+  subscribeReactions,
 }: VotingViewProps) {
   const [timeLeft, setTimeLeft] = useState(20)
   const [selectedVote, setSelectedVote] = useState<string | null>(null)
+  const [floatingReactions, setFloatingReactions] = useState<(LiveReaction & { sway: number; dur: number })[]>([])
+  const [reactionText, setReactionText] = useState("")
+  const [showReactionMenu, setShowReactionMenu] = useState(false)
+
+  useEffect(() => {
+    if (!subscribeReactions) return
+    return subscribeReactions((reaction) => {
+      const sway = Math.round((Math.random() - 0.5) * 34)
+      const dur = reaction.kind === "text" ? 3.2 : 2.5
+      setFloatingReactions((prev) => [...prev.slice(-24), { ...reaction, sway, dur }])
+      setTimeout(() => {
+        setFloatingReactions((prev) => prev.filter((r) => r.id !== reaction.id))
+      }, dur * 1000)
+    })
+  }, [subscribeReactions])
+
+  const handleSendTextReaction = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!onSendReaction || !reactionText.trim()) return
+    onSendReaction("text", reactionText)
+    setReactionText("")
+  }
   const isIncognito = gameMode === "incognito"
   const isOwnMeme = meme.playerId === currentPlayerId
   const showOwnMemeScreen = isOwnMeme && !isIncognito
@@ -189,6 +220,65 @@ export function VotingView({
                   }}
                 />
               </div>
+
+              {/* Bottom-left live reaction trigger + popover */}
+              {onSendReaction && (
+                <div className="absolute bottom-2 left-2 z-20 flex flex-col items-start gap-2">
+                  {showReactionMenu && (
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      className="p-2.5 rounded-xl border-2 border-primary bg-card/95 backdrop-blur-md shadow-[4px_4px_0px_oklch(0.75_0.25_300_/_0.45)] space-y-2 w-64 animate-in fade-in zoom-in-95 duration-150"
+                    >
+                      <div className="flex items-center justify-between gap-1">
+                        {QUICK_VOTE_EMOJIS.map((emoji) => (
+                          <button
+                            key={emoji}
+                            type="button"
+                            onClick={() => onSendReaction("emoji", emoji)}
+                            className="h-8 w-8 rounded-lg border border-border bg-muted/40 hover:bg-muted active:scale-90 text-base flex items-center justify-center transition-transform"
+                            title={`Réagir ${emoji}`}
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                      <form onSubmit={handleSendTextReaction} className="flex items-center gap-1.5">
+                        <Input
+                          value={reactionText}
+                          onChange={(e) => setReactionText(e.target.value.slice(0, 45))}
+                          placeholder="Bulle en direct..."
+                          maxLength={45}
+                          className="h-8 text-xs font-semibold border border-border"
+                        />
+                        <Button
+                          type="submit"
+                          size="icon"
+                          disabled={!reactionText.trim()}
+                          className="h-8 w-8 shrink-0"
+                          title="Envoyer la bulle"
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                        </Button>
+                      </form>
+                    </div>
+                  )}
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowReactionMenu((v) => !v)}
+                    className={`h-8 px-2.5 rounded-full shadow-md bg-background/85 backdrop-blur-sm border-2 text-xs font-black ${
+                      showReactionMenu ? "border-primary text-primary" : ""
+                    }`}
+                    title="Réagir en direct"
+                  >
+                    <SmilePlus className="w-3.5 h-3.5 mr-1 text-primary" />
+                    <span>Réagir</span>
+                  </Button>
+                </div>
+              )}
+
               <MemeMedia
                 src={meme.imageUrl}
                 alt="Meme"
@@ -332,6 +422,41 @@ export function VotingView({
           </>
         )}
       </div>
+
+      {/* Floating Steam Reactions Overlay (portaled to body so fixed positioning is never trapped) */}
+      {typeof document !== "undefined" &&
+        floatingReactions.length > 0 &&
+        createPortal(
+          <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden select-none">
+            {floatingReactions.map((r) => {
+              const style: CSSProperties & Record<string, string | number> = {
+                left: `${r.xPercent}%`,
+                bottom: "88px",
+                animation: `reaction-steam ${r.dur}s ease-out forwards`,
+                "--sway-x": `${r.sway}px`,
+              }
+              return (
+                <div key={r.id} style={style} className="absolute will-change-transform">
+                  {r.kind === "emoji" ? (
+                    <span className="text-3xl sm:text-4xl drop-shadow-md inline-block">{r.content}</span>
+                  ) : (
+                    <div className="px-3 py-1.5 rounded-2xl border-2 border-primary bg-card/95 text-foreground shadow-[3px_3px_0px_oklch(0.75_0.25_300_/_0.5)] max-w-[220px]">
+                      {r.authorLabel && (
+                        <span className="block text-[9px] font-black uppercase tracking-wider text-primary leading-tight">
+                          {r.authorLabel}
+                        </span>
+                      )}
+                      <span className="text-xs sm:text-sm font-bold break-words leading-snug">
+                        {r.content}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>,
+          document.body
+        )}
     </div>
   )
 }

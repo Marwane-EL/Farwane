@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react"
 import { supabase } from "@/lib/supabase"
 import type { RealtimeChannel } from "@supabase/supabase-js"
-import type { Player, Meme, MemePack, MemeLibrary, GamePhase, GameSettings, NichePoolItem, ChatMessage, HeartRedistribution, DuelEvent } from "@/types/game"
+import type { Player, Meme, MemePack, MemeLibrary, GamePhase, GameSettings, NichePoolItem, ChatMessage, HeartRedistribution, DuelEvent, LiveReaction } from "@/types/game"
 import { SECRET_CODENAMES } from "@/types/game"
 import { getCachedPacks } from "@/lib/packs-cache"
 import { getCachedMediaUrl } from "@/lib/media-cache"
@@ -99,6 +99,7 @@ interface StoredSession {
 export function useGameRoom() {
   const channelRef = useRef<RealtimeChannel | null>(null)
   const duelListenersRef = useRef<Set<(event: DuelEvent) => void>>(new Set())
+  const reactionListenersRef = useRef<Set<(reaction: LiveReaction) => void>>(new Set())
   const playerIdRef = useRef<string>("")
   const usedMemeUrlsRef = useRef<Set<string>>(new Set())
   const usedNicheCountRef = useRef<Record<string, number>>({})
@@ -563,6 +564,13 @@ export function useGameRoom() {
       const event = payload?.event as DuelEvent | undefined
       if (!event) return
       duelListenersRef.current.forEach((cb) => cb(event))
+    })
+
+    // Live floating reactions during voting
+    channel.on("broadcast", { event: "vote:reaction" }, ({ payload }) => {
+      const reaction = payload?.reaction as LiveReaction | undefined
+      if (!reaction) return
+      reactionListenersRef.current.forEach((cb) => cb(reaction))
     })
 
     // ─── Late Joiner & Reconnection State Sync ─────────────────────────────────
@@ -1164,6 +1172,40 @@ export function useGameRoom() {
     }
   }, [])
 
+  const sendVoteReaction = useCallback((kind: "emoji" | "text", content: string) => {
+    if (!channelRef.current || !currentPlayer) return
+    const clean = content.trim().slice(0, kind === "emoji" ? 8 : 45)
+    if (!clean) return
+
+    const isMaskedIncognito = settingsRef.current.gameMode === "incognito"
+    const authorLabel = isMaskedIncognito
+      ? (codenamesRef.current[currentPlayer.id] || "Fantôme 👻")
+      : currentPlayer.pseudo
+
+    const reaction: LiveReaction = {
+      id: crypto.randomUUID(),
+      kind,
+      content: clean,
+      authorLabel: kind === "text" ? authorLabel : undefined,
+      xPercent: Math.round(12 + Math.random() * 72),
+      createdAt: Date.now(),
+    }
+
+    reactionListenersRef.current.forEach((cb) => cb(reaction))
+    channelRef.current.send({
+      type: "broadcast",
+      event: "vote:reaction",
+      payload: { reaction },
+    })
+  }, [currentPlayer])
+
+  const subscribeVoteReactions = useCallback((cb: (reaction: LiveReaction) => void) => {
+    reactionListenersRef.current.add(cb)
+    return () => {
+      reactionListenersRef.current.delete(cb)
+    }
+  }, [])
+
   return {
     phase, roomCode, players, currentPlayer,
     settings, currentRound, playerScores, roundStartedAt,
@@ -1175,6 +1217,7 @@ export function useGameRoom() {
     nichePool, currentNiche,
     chatMessages, sendChatMessage,
     sendDuelEvent, subscribeDuelEvents,
+    sendVoteReaction, subscribeVoteReactions,
     heartRedistribution,
     createRoom, joinRoom, leaveRoom,
     updateSettings, selectPack, startGame,

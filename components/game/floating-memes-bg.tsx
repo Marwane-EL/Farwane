@@ -6,6 +6,7 @@ import type { CSSProperties } from "react"
 interface FloatingItem {
   url: string
   isVideo: boolean
+  mode: "calm" | "loop" | "turbo"
   startX: number
   startY: number
   midX: number
@@ -75,7 +76,13 @@ function randomEdgePoint(edge: number): { x: number; y: number } {
   }
 }
 
-export function FloatingMemesBg({ memeUrls }: { memeUrls: string[] }) {
+export function FloatingMemesBg({
+  memeUrls,
+  showMemes = true,
+}: {
+  memeUrls: string[]
+  showMemes?: boolean
+}) {
   const [items, setItems] = useState<FloatingItem[]>([])
   const [particles, setParticles] = useState<Particle[]>([])
   const initializedRef = useRef(false)
@@ -87,7 +94,7 @@ export function FloatingMemesBg({ memeUrls }: { memeUrls: string[] }) {
       y: randomBetween(5, 95),
       size: randomBetween(3, 7),
       color: PARTICLE_COLORS[idx % PARTICLE_COLORS.length],
-      opacity: Number((0.25 + Math.random() * 0.45).toFixed(2)),
+      opacity: Number((0.35 + Math.random() * 0.45).toFixed(2)),
       dx: randomBetween(-90, 90),
       dy: randomBetween(-140, -50),
       duration: randomBetween(7, 15),
@@ -109,24 +116,33 @@ export function FloatingMemesBg({ memeUrls }: { memeUrls: string[] }) {
     const picked = shuffled.slice(0, COUNT)
 
     const built: FloatingItem[] = picked.map((url, idx) => {
+      // 1 occasional looping meme, 1 occasional 2000km/h turbo meme, rest calm
+      const mode: "calm" | "loop" | "turbo" =
+        idx === 1 ? "loop" : idx === 4 ? "turbo" : "calm"
+
       const startEdge = idx % 4
       // Always exit on the opposite edge (0<->1, 2<->3) so distance is consistent
       const endEdge = startEdge ^ 1
 
-      const start = randomEdgePoint(startEdge)
-      const end = randomEdgePoint(endEdge)
+      const start = mode === "loop" ? { x: -18, y: randomBetween(30, 72) } : randomEdgePoint(startEdge)
+      const end = mode === "loop" ? { x: 118, y: randomBetween(25, 70) } : randomEdgePoint(endEdge)
       const midX = Math.round((start.x + end.x) / 2 + randomBetween(-8, 8))
       const midY = Math.round((start.y + end.y) / 2 + randomBetween(-8, 8))
 
-      // Constant calm speed proportional to distance
       const dist = Math.hypot(end.x - start.x, end.y - start.y)
-      const duration = Math.round(Math.max(28, Math.min(42, dist * 0.25)))
-      const delay = -Math.floor((duration / COUNT) * idx)
+      const duration =
+        mode === "turbo"
+          ? 24 // waits offscreen ~20s then rockets across in ~2.4s!
+          : mode === "loop"
+            ? 26
+            : Math.round(Math.max(28, Math.min(42, dist * 0.25)))
+      const delay = mode === "turbo" ? -12 : -Math.floor((duration / COUNT) * idx)
       const angleDeg = Math.round((Math.atan2(end.y - start.y, end.x - start.x) * 180) / Math.PI)
 
       return {
         url,
         isVideo: isVideoFile(url),
+        mode,
         startX: start.x,
         startY: start.y,
         midX,
@@ -171,15 +187,21 @@ export function FloatingMemesBg({ memeUrls }: { memeUrls: string[] }) {
         )
       })}
 
-      {/* Floating random memes/GIFs with rocket thruster particles */}
-      {items.map((item, idx) => {
+      {/* Floating random memes/GIFs with subtle stardust trail (home only) */}
+      {showMemes && items.map((item, idx) => {
+        const animClass =
+          item.mode === "loop"
+            ? "anim-float-looping"
+            : item.mode === "turbo"
+              ? "anim-float-turbo"
+              : "anim-float-random"
+
         const style: CSSProperties & Record<string, string | number> = {
           top: 0,
           left: 0,
-          animationName: "float-random",
           animationDuration: `${item.duration}s`,
           animationDelay: `${item.delay}s`,
-          animationTimingFunction: "linear",
+          animationTimingFunction: item.mode === "loop" ? "ease-in-out" : "linear",
           animationIterationCount: "infinite",
           "--start-x": `${item.startX}vw`,
           "--start-y": `${item.startY}vh`,
@@ -193,7 +215,7 @@ export function FloatingMemesBg({ memeUrls }: { memeUrls: string[] }) {
           <div
             key={`${item.url}-${idx}`}
             style={style}
-            className={`absolute ${item.sizeClass} will-change-transform`}
+            className={`absolute ${item.sizeClass} ${animClass} will-change-transform`}
           >
             {/* Subtle stardust trail pointing opposite to flight direction */}
             <div

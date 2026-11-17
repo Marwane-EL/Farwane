@@ -140,3 +140,12 @@ export interface UserProfile {
   libraries: MemeLibrary[]
   stats: UserStats
 }
+
+export interface LiveReaction {
+  id: string
+  kind: "emoji" | "text"
+  content: string
+  authorLabel?: string
+  xPercent: number
+  createdAt: number
+}

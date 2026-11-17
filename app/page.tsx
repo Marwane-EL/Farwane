@@ -9,6 +9,7 @@ import { FinalResultsView } from "@/components/game/final-results-view"
 import { RoomChat } from "@/components/game/room-chat"
 import { AuthModal } from "@/components/game/auth-modal"
 import { ProfileModal } from "@/components/game/profile-modal"
+import { FloatingMemesBg } from "@/components/game/floating-memes-bg"
 import { useGameRoom } from "@/hooks/use-game-room"
 import { useNicheLibrary } from "@/hooks/use-niche-library"
 import { useAuthProfile } from "@/hooks/use-auth-profile"
@@ -40,6 +41,7 @@ export default function MemeGame() {
     nichePool, currentNiche,
     chatMessages, sendChatMessage,
     sendDuelEvent, subscribeDuelEvents,
+    sendVoteReaction, subscribeVoteReactions,
     heartRedistribution,
     createRoom, joinRoom, leaveRoom,
     updateSettings, selectPack, startGame,
@@ -146,6 +148,8 @@ export default function MemeGame() {
         <div className="aurora-blob aurora-blob-3" />
         <div className="aurora-blob aurora-blob-4" />
       </div>
+      {/* Ambient particles across all screens + floating memes on home */}
+      <FloatingMemesBg memeUrls={memePacks.flatMap((p) => p.memes)} showMemes={phase === "home"} />
 
       <div className="relative z-10 flex-1 w-full h-full flex flex-col overflow-hidden">
         {phase === "home" && (
@@ -242,6 +246,8 @@ export default function MemeGame() {
               submissions[currentMemeIndex].caption
             )}
             onToggleSavedBanger={toggleSavedBanger}
+            onSendReaction={sendVoteReaction}
+            subscribeReactions={subscribeVoteReactions}
           />
         )}
         {phase === "results" && (
