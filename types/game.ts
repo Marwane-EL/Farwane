@@ -149,3 +149,18 @@ export interface LiveReaction {
   xPercent: number
   createdAt: number
 }
+
+// ─── Friends & Direct Room Invitations ────────────────────────────────────────
+
+export interface FriendProfile {
+  id: string
+  pseudo: string
+  avatar: string
+}
+
+export interface FriendshipEntry {
+  friendshipId: string
+  user: FriendProfile
+  status: "pending" | "accepted"
+  direction: "incoming" | "outgoing" | "accepted"
+}

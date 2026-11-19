@@ -195,6 +195,7 @@ export function ProfileModal({
                             src={banger.imageUrl}
                             alt={banger.caption}
                             className="w-full h-full object-contain"
+                            forceMuted
                           />
                         </div>
 
@@ -263,6 +264,7 @@ export function ProfileModal({
                         src={url}
                         alt={`Favori ${idx + 1}`}
                         className="w-full h-full object-cover"
+                        forceMuted
                       />
                       <button
                         type="button"

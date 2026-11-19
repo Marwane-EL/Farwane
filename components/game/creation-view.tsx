@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
-import { Clock, Send, CheckCircle, Users, Loader2, RefreshCw, Star } from "lucide-react"
+import { Clock, Send, CheckCircle, Users, Loader2, RefreshCw, Star, Undo2 } from "lucide-react"
 import { MemeMedia } from "@/components/game/meme-media"
 import { PokemonMemory } from "@/components/game/pokemon-memory"
 import { TetrisGame } from "@/components/game/tetris/TetrisGame"
@@ -29,6 +29,9 @@ interface CreationViewProps {
   currentRound: number
   totalRounds: number
   onRefreshMeme: () => void
+  onPreviousMeme?: () => void
+  canGoBackMeme?: boolean
+  canGoForwardMeme?: boolean
   refreshesLeft: number
   currentNiche: NichePoolItem | null
   nichePool?: NichePoolItem[]
@@ -54,6 +57,9 @@ export function CreationView({
   currentRound,
   totalRounds,
   onRefreshMeme,
+  onPreviousMeme,
+  canGoBackMeme = false,
+  canGoForwardMeme = false,
   refreshesLeft,
   currentNiche,
   nichePool = [],
@@ -328,16 +334,30 @@ export function CreationView({
                     <span className="hidden sm:inline">{isFavoriteMeme ? "Favori" : "Ajouter aux favoris"}</span>
                   </Button>
                 )}
+                {onPreviousMeme && canGoBackMeme && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={onPreviousMeme}
+                    disabled={hasSubmitted}
+                    title="Revenir au meme précédent"
+                    className="gap-1 h-7 px-2 text-xs font-bold"
+                  >
+                    <Undo2 className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Précédent</span>
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={onRefreshMeme}
-                  disabled={refreshesLeft <= 0 || hasSubmitted}
+                  disabled={(refreshesLeft <= 0 && !canGoForwardMeme) || hasSubmitted}
                   className="gap-1.5 h-7 px-2 text-xs font-bold"
                 >
                   <RefreshCw className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Changer</span>
-                  <span className="text-muted-foreground">({refreshesLeft})</span>
+                  <span className="hidden sm:inline">{canGoForwardMeme ? "Suivant" : "Changer"}</span>
+                  {!canGoForwardMeme && <span className="text-muted-foreground">({refreshesLeft})</span>}
                 </Button>
               </div>
             </div>

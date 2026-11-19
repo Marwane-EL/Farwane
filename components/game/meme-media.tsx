@@ -85,6 +85,13 @@ export function MemeMedia({ src, alt, className, forceMuted = false }: MemeMedia
         })
       }
     }
+
+    const el = videoRef.current
+    return () => {
+      if (el) {
+        el.pause()
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolvedSrc, isVideo, forceMuted])
 

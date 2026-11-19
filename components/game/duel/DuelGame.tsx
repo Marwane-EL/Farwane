@@ -76,6 +76,8 @@ export function DuelGame({ me, sendDuelEvent, subscribeDuelEvents }: DuelGamePro
   const [myPick, setMyPick] = useState<RpsChoice | null>(null)
   const [oppPick, setOppPick] = useState<RpsChoice | null>(null)
   const [rpsSeriesOver, setRpsSeriesOver] = useState(false)
+  const oppBufferedPicksRef = useRef<Record<number, RpsChoice>>({})
+  const scoredRoundRef = useRef<number>(0)
 
   // Refs for stable event handler
   const isQueuingRef = useRef(isQueuing)
@@ -92,6 +94,9 @@ export function DuelGame({ me, sendDuelEvent, subscribeDuelEvents }: DuelGamePro
     setTttStarter(nextStarter)
     setTttTurn(nextStarter === "host" ? "X" : "O")
     setRpsRound(1)
+    rpsRoundRef.current = 1
+    oppBufferedPicksRef.current = {}
+    scoredRoundRef.current = 0
     setMyPick(null)
     setOppPick(null)
     setRpsSeriesOver(false)
@@ -184,6 +189,7 @@ export function DuelGame({ me, sendDuelEvent, subscribeDuelEvents }: DuelGamePro
 
       if (ev.type === "duel:rps_pick") {
         if (ev.playerId === me.id) return
+        oppBufferedPicksRef.current[ev.round] = ev.choice
         if (ev.round === rpsRoundRef.current) {
           setOppPick(ev.choice)
         }
@@ -208,6 +214,8 @@ export function DuelGame({ me, sendDuelEvent, subscribeDuelEvents }: DuelGamePro
   // Evaluate RPS round when both players have picked
   useEffect(() => {
     if (!match || match.game !== "rps" || !myPick || !oppPick) return
+    if (scoredRoundRef.current === rpsRound) return
+    scoredRoundRef.current = rpsRound
     const outcome = getRpsOutcome(myPick, oppPick)
     if (outcome === "win") {
       setScores((prev) => {
@@ -222,7 +230,22 @@ export function DuelGame({ me, sendDuelEvent, subscribeDuelEvents }: DuelGamePro
         return { ...prev, opponent: nextOpp }
       })
     }
-  }, [match, myPick, oppPick])
+  }, [match, myPick, oppPick, rpsRound])
+
+  // Re-broadcast our pick while waiting for opponent (protects against any dropped UDP/WebSocket packet)
+  useEffect(() => {
+    if (!match || match.game !== "rps" || !myPick || oppPick || rpsSeriesOver || opponentLeft) return
+    const interval = setInterval(() => {
+      sendDuelEvent({
+        type: "duel:rps_pick",
+        matchId: match.matchId,
+        playerId: me.id,
+        round: rpsRound,
+        choice: myPick,
+      })
+    }, 1500)
+    return () => clearInterval(interval)
+  }, [match, myPick, oppPick, rpsRound, rpsSeriesOver, opponentLeft, me.id, sendDuelEvent])
 
   const toggleQueue = (kind?: DuelKind) => {
     const targetKind = kind ?? selectedKind
@@ -300,9 +323,11 @@ export function DuelGame({ me, sendDuelEvent, subscribeDuelEvents }: DuelGamePro
   }
 
   const nextRpsRound = () => {
-    setRpsRound((r) => r + 1)
+    const nextRound = rpsRound + 1
+    rpsRoundRef.current = nextRound
+    setRpsRound(nextRound)
     setMyPick(null)
-    setOppPick(null)
+    setOppPick(oppBufferedPicksRef.current[nextRound] ?? null)
   }
 
   const triggerRematch = () => {
@@ -490,7 +515,7 @@ export function DuelGame({ me, sendDuelEvent, subscribeDuelEvents }: DuelGamePro
             )}
           </div>
 
-          <div className="grid grid-cols-3 gap-2 w-52 h-52 sm:w-60 sm:h-60">
+          <div className="grid grid-cols-3 grid-rows-3 gap-2 w-52 h-52 sm:w-60 sm:h-60 shrink-0">
             {tttBoard.map((cell, idx) => {
               const isWinCell = tttResult?.line?.includes(idx)
               const canPlay = !tttResult?.winner && tttTurn === mySymbol && cell === null
@@ -500,7 +525,7 @@ export function DuelGame({ me, sendDuelEvent, subscribeDuelEvents }: DuelGamePro
                   type="button"
                   disabled={!canPlay}
                   onClick={() => handleTttClick(idx)}
-                  className={`rounded-xl border-2 text-3xl sm:text-4xl font-black flex items-center justify-center transition-all ${
+                  className={`w-full h-full aspect-square rounded-xl border-2 text-3xl sm:text-4xl leading-none font-black flex items-center justify-center transition-all ${
                     isWinCell
                       ? "border-emerald-400 bg-emerald-500/20 scale-105"
                       : canPlay

@@ -9,10 +9,12 @@ import { FinalResultsView } from "@/components/game/final-results-view"
 import { RoomChat } from "@/components/game/room-chat"
 import { AuthModal } from "@/components/game/auth-modal"
 import { ProfileModal } from "@/components/game/profile-modal"
+import { FriendsModal } from "@/components/game/friends-modal"
 import { FloatingMemesBg } from "@/components/game/floating-memes-bg"
 import { useGameRoom } from "@/hooks/use-game-room"
 import { useNicheLibrary } from "@/hooks/use-niche-library"
 import { useAuthProfile } from "@/hooks/use-auth-profile"
+import { useFriends } from "@/hooks/use-friends"
 import { resetTetrisScore } from "@/components/game/tetris/TetrisGame"
 import { resetSnakeScore } from "@/components/game/snake/SnakeGame"
 
@@ -25,6 +27,7 @@ export default function MemeGame() {
   const [mounted, setMounted] = useState(false)
   const [authModalOpen, setAuthModalOpen] = useState(false)
   const [profileModalTab, setProfileModalTab] = useState<"bangers" | "favorites" | "profile" | null>(null)
+  const [friendsModalOpen, setFriendsModalOpen] = useState(false)
 
   useEffect(() => {
     setMounted(true)
@@ -43,11 +46,11 @@ export default function MemeGame() {
     sendDuelEvent, subscribeDuelEvents,
     sendVoteReaction, subscribeVoteReactions,
     heartRedistribution,
-    createRoom, joinRoom, leaveRoom,
+    createRoom, joinRoom, leaveRoom, transferHost, kickPlayer,
     updateSettings, selectPack, startGame,
     submitMeme, moveToVoting, vote,
     advanceMeme, nextRound, newGame,
-    refreshMeme, refreshesLeft,
+    refreshMeme, previousMeme, canGoBackMeme, canGoForwardMeme, refreshesLeft,
     setError,
     createLibrary, deleteLibrary, addMemeToLibrary, removeMemeFromLibrary, hydrateLibraries,
     addNicheToPool, removeNicheFromPool, clearNichePool,
@@ -82,6 +85,24 @@ export default function MemeGame() {
     onHydrateNiches: hydrateNiches,
     onHydrateLibraries: hydrateLibraries,
     onRequireAuth: () => setAuthModalOpen(true),
+  })
+
+  const {
+    friends,
+    incomingRequests,
+    outgoingRequests,
+    onlineUserIds,
+    searchPlayersByPseudo,
+    sendFriendRequest,
+    acceptFriendRequest,
+    removeFriendship,
+    sendRoomInvite,
+  } = useFriends(profile, async (invitedRoomCode) => {
+    if (roomCode && roomCode !== invitedRoomCode) {
+      await leaveRoom()
+    }
+    resetMiniGames()
+    joinRoom(invitedRoomCode, profile?.pseudo || "Joueur", profile?.avatar)
   })
 
   // Sync personal libraries to cloud when logged in
@@ -168,6 +189,8 @@ export default function MemeGame() {
             profile={profile}
             onOpenAuth={() => setAuthModalOpen(true)}
             onOpenProfile={(tab) => setProfileModalTab(tab)}
+            onOpenFriends={() => setFriendsModalOpen(true)}
+            pendingFriendRequestsCount={incomingRequests.length}
             externalNiches={personalNiches}
             onAddExternalNiche={addToPersonalLibrary}
             onEditExternalNiche={editPersonalNiche}
@@ -195,6 +218,9 @@ export default function MemeGame() {
             onClearNiches={() => clearNichePool(currentPlayer?.isHost ?? false)}
             onStartGame={() => { resetMiniGames(); startGame(); }}
             onLeave={() => { resetMiniGames(); leaveRoom(); }}
+            onTransferHost={transferHost}
+            onKickPlayer={kickPlayer}
+            onOpenFriends={profile ? () => setFriendsModalOpen(true) : undefined}
           />
         )}
         {phase === "creation" && (
@@ -211,6 +237,9 @@ export default function MemeGame() {
             currentRound={currentRound}
             totalRounds={settings.totalRounds}
             onRefreshMeme={refreshMeme}
+            onPreviousMeme={previousMeme}
+            canGoBackMeme={canGoBackMeme}
+            canGoForwardMeme={canGoForwardMeme}
             refreshesLeft={refreshesLeft}
             currentNiche={currentNiche}
             nichePool={nichePool}
@@ -311,6 +340,24 @@ export default function MemeGame() {
           onToggleFavoriteMeme={toggleFavoriteMeme}
           onRemoveBanger={removeBanger}
           onSignOut={signOut}
+        />
+      )}
+
+      {/* Friends & Direct Invitations Modal */}
+      {profile && (
+        <FriendsModal
+          open={friendsModalOpen}
+          onClose={() => setFriendsModalOpen(false)}
+          friends={friends}
+          incomingRequests={incomingRequests}
+          outgoingRequests={outgoingRequests}
+          onlineUserIds={onlineUserIds}
+          activeRoomCode={phase !== "home" ? roomCode : undefined}
+          onSearchPlayers={searchPlayersByPseudo}
+          onSendFriendRequest={sendFriendRequest}
+          onAcceptFriendRequest={acceptFriendRequest}
+          onRemoveFriendship={removeFriendship}
+          onSendRoomInvite={sendRoomInvite}
         />
       )}
     </main>

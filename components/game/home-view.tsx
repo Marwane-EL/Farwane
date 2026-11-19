@@ -46,6 +46,8 @@ interface HomeViewProps {
   profile?: UserProfile | null
   onOpenAuth?: () => void
   onOpenProfile?: (tab: "bangers" | "favorites" | "profile") => void
+  onOpenFriends?: () => void
+  pendingFriendRequestsCount?: number
   externalNiches?: NicheItem[]
   onAddExternalNiche?: (text: string) => void
   onEditExternalNiche?: (id: string, text: string) => void
@@ -67,6 +69,8 @@ export function HomeView({
   profile,
   onOpenAuth,
   onOpenProfile,
+  onOpenFriends,
+  pendingFriendRequestsCount = 0,
   externalNiches,
   onAddExternalNiche,
   onEditExternalNiche,
@@ -158,6 +162,19 @@ export function HomeView({
           <div className="flex items-center gap-2">
           {profile ? (
             <>
+              <button
+                type="button"
+                onClick={() => onOpenFriends?.()}
+                className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-xl border-2 border-primary/50 bg-primary/15 hover:bg-primary/25 text-primary text-xs font-black transition-all"
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>Amis</span>
+                {pendingFriendRequestsCount > 0 && (
+                  <span className="flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-destructive text-white text-[10px] font-black">
+                    {pendingFriendRequestsCount}
+                  </span>
+                )}
+              </button>
               <button
                 type="button"
                 onClick={() => onOpenProfile?.("bangers")}

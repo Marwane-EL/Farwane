@@ -8,6 +8,7 @@ import { SECRET_CODENAMES } from "@/types/game"
 import { getCachedPacks } from "@/lib/packs-cache"
 import { getCachedMediaUrl } from "@/lib/media-cache"
 import { getApiBase } from "@/lib/utils"
+import { toast } from "sonner"
 
 const avatars = ["🎮", "🔥", "👑", "💀", "🚀", "🎲", "🎯", "⚡", "🌟", "🎪", "🦄", "🐉"]
 
@@ -129,6 +130,8 @@ export function useGameRoom() {
   // Game state
   const [selectedPack, setSelectedPack] = useState<MemePack | null>(null)
   const [myMemeUrl, setMyMemeUrl] = useState("")
+  const [memeHistory, setMemeHistory] = useState<string[]>([])
+  const [memeHistoryIndex, setMemeHistoryIndex] = useState(0)
   const [submissions, setSubmissions] = useState<Meme[]>([])
   const [currentMemeIndex, setCurrentMemeIndex] = useState(0)
   const [hasSubmitted, setHasSubmitted] = useState(false)
@@ -213,6 +216,10 @@ export function useGameRoom() {
                 setSubmissions(saved.submissions || [])
                 setCurrentMemeIndex(saved.currentMemeIndex || 0)
                 setMyMemeUrl(saved.myMemeUrl || "")
+                if (saved.myMemeUrl) {
+                  setMemeHistory([saved.myMemeUrl])
+                  setMemeHistoryIndex(0)
+                }
                 setHasSubmitted(saved.hasSubmitted || false)
                 setRefreshesLeft(saved.refreshesLeft ?? DEFAULT_SETTINGS.maxRefreshes)
                 setHasUsedHeart(saved.hasUsedHeart || false)
@@ -409,6 +416,80 @@ export function useGameRoom() {
         }
       }
       setPlayers(playerList)
+
+      // Auto-migrate host if the previous host disconnected unexpectedly
+      if (playerList.length > 0 && !playerList.some((p) => p.isHost)) {
+        const elected = [...playerList].sort((a, b) => a.id.localeCompare(b.id))[0]
+        if (elected && elected.id === playerIdRef.current && currentPlayerRef.current && !currentPlayerRef.current.isHost) {
+          const promoted: Player = { ...currentPlayerRef.current, isHost: true }
+          currentPlayerRef.current = promoted
+          setCurrentPlayer(promoted)
+          supabase.from("rooms").update({ host_id: elected.id }).eq("code", code).then(() => {})
+          channel.track(promoted)
+          channel.send({
+            type: "broadcast",
+            event: "game:host-transfer",
+            payload: { newHostId: elected.id },
+          })
+          toast.info("L'hôte a quitté — tu es maintenant le chef du salon !")
+        }
+      }
+    })
+
+    // Host transfer
+    channel.on("broadcast", { event: "game:host-transfer" }, ({ payload }) => {
+      const newHostId = payload?.newHostId as string | undefined
+      if (!newHostId) return
+      setPlayers((prev) => prev.map((p) => ({ ...p, isHost: p.id === newHostId })))
+      if (currentPlayerRef.current) {
+        const amNewHost = currentPlayerRef.current.id === newHostId
+        const wasHost = currentPlayerRef.current.isHost
+        const updated = { ...currentPlayerRef.current, isHost: amNewHost }
+        currentPlayerRef.current = updated
+        setCurrentPlayer(updated)
+        if (amNewHost && !wasHost) {
+          channel.track(updated)
+          toast.info("Tu es maintenant le chef du salon !")
+        }
+      }
+    })
+
+    // Kick player
+    channel.on("broadcast", { event: "game:kick" }, async ({ payload }) => {
+      const targetPlayerId = payload?.targetPlayerId as string | undefined
+      if (!targetPlayerId) return
+      if (targetPlayerId === playerIdRef.current) {
+        sessionStorage.removeItem(SESSION_STORAGE_KEY)
+        if (typeof window !== "undefined") {
+          window.history.replaceState(null, "", "/")
+        }
+        if (channelRef.current) {
+          await channelRef.current.untrack()
+          supabase.removeChannel(channelRef.current)
+          channelRef.current = null
+        }
+        setPhase("home")
+        setCurrentPlayer(null)
+        setPlayers([])
+        setRoomCode("")
+        setSelectedPack(null)
+        setSubmissions([])
+        setCurrentMemeIndex(0)
+        setMyMemeUrl("")
+        setHasSubmitted(false)
+        setHasUsedHeart(false)
+        heartVotersRef.current.clear()
+        setHeartRedistribution(null)
+        setCurrentRound(1)
+        setPlayerScores({})
+        setSettings(DEFAULT_SETTINGS)
+        setRoundStartedAt(undefined)
+        setChatMessages([])
+        currentAssignmentsRef.current = {}
+        toast.error("Tu as été exclu du salon par le chef.")
+      } else {
+        setPlayers((prev) => prev.filter((p) => p.id !== targetPlayerId))
+      }
     })
 
     // Settings update
@@ -433,9 +514,12 @@ export function useGameRoom() {
 
     // Game start
     channel.on("broadcast", { event: "game:start" }, ({ payload }) => {
+      const assigned = payload.assignments[playerIdRef.current] || ""
       setPhase("creation")
       setSelectedPack(payload.pack)
-      setMyMemeUrl(payload.assignments[playerIdRef.current] || "")
+      setMyMemeUrl(assigned)
+      setMemeHistory(assigned ? [assigned] : [])
+      setMemeHistoryIndex(0)
       setSettings(payload.settings)
       setCurrentRound(1)
       setPlayerScores({})
@@ -510,8 +594,11 @@ export function useGameRoom() {
 
     // Next round
     channel.on("broadcast", { event: "game:next-round" }, ({ payload }) => {
+      const assigned = payload.assignments[playerIdRef.current] || ""
       setPhase("creation")
-      setMyMemeUrl(payload.assignments[playerIdRef.current] || "")
+      setMyMemeUrl(assigned)
+      setMemeHistory(assigned ? [assigned] : [])
+      setMemeHistoryIndex(0)
       setCurrentRound(payload.round)
       setSubmissions([])
       setHasSubmitted(false)
@@ -640,7 +727,9 @@ export function useGameRoom() {
       if (payload.assignments) {
         currentAssignmentsRef.current = payload.assignments
         if (payload.assignments[playerIdRef.current]) {
-          setMyMemeUrl(payload.assignments[playerIdRef.current])
+          const assigned = payload.assignments[playerIdRef.current]
+          setMyMemeUrl(assigned)
+          setMemeHistory((prev) => (prev.length > 0 ? prev : [assigned]))
         }
       }
       setIsLoading(false)
@@ -775,8 +864,11 @@ export function useGameRoom() {
     // Draw niche for round 1
     const niche = drawNiche(nichePool, usedNicheCountRef.current, settings.gameMode)
     const now = Date.now()
+    const myInitialMeme = assignments[playerIdRef.current] || ""
 
-    setMyMemeUrl(assignments[playerIdRef.current] || "")
+    setMyMemeUrl(myInitialMeme)
+    setMemeHistory(myInitialMeme ? [myInitialMeme] : [])
+    setMemeHistoryIndex(0)
     setCurrentNiche(niche)
     setRoundStartedAt(now)
     roundStartedAtRef.current = now
@@ -816,11 +908,17 @@ export function useGameRoom() {
 
   const moveToVoting = useCallback(() => {
     if (!currentPlayer?.isHost || !channelRef.current) return
+    const shuffled = [...submissions]
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+    }
+    setSubmissions(shuffled)
     setPhase("voting")
     setCurrentMemeIndex(0)
     setHasVotedOnCurrent(false)
     setCurrentVoters([])
-    channelRef.current.send({ type: "broadcast", event: "game:voting", payload: { submissions } })
+    channelRef.current.send({ type: "broadcast", event: "game:voting", payload: { submissions: shuffled } })
   }, [currentPlayer, submissions])
 
   const vote = useCallback((memeId: string, score: number, isHeart: boolean = false) => {
@@ -969,8 +1067,11 @@ export function useGameRoom() {
 
       const niche = drawNiche(nichePool, usedNicheCountRef.current, settings.gameMode)
       const now = Date.now()
+      const myNextMeme = assignments[playerIdRef.current] || ""
 
-      setMyMemeUrl(assignments[playerIdRef.current] || "")
+      setMyMemeUrl(myNextMeme)
+      setMemeHistory(myNextMeme ? [myNextMeme] : [])
+      setMemeHistoryIndex(0)
       setCurrentNiche(niche)
       setRoundStartedAt(now)
       roundStartedAtRef.current = now
@@ -1011,18 +1112,62 @@ export function useGameRoom() {
     channelRef.current.send({ type: "broadcast", event: "game:new-game", payload: {} })
   }, [currentPlayer, roomCode])
 
+  const transferHost = useCallback(async (targetPlayerId: string) => {
+    if (!currentPlayer?.isHost || !channelRef.current || !roomCode) return
+    if (targetPlayerId === currentPlayer.id) return
+
+    await supabase.from("rooms").update({ host_id: targetPlayerId }).eq("code", roomCode)
+
+    const demoted: Player = { ...currentPlayer, isHost: false }
+    currentPlayerRef.current = demoted
+    setCurrentPlayer(demoted)
+    setPlayers((prev) => prev.map((p) => ({ ...p, isHost: p.id === targetPlayerId })))
+    await channelRef.current.track(demoted)
+    channelRef.current.send({
+      type: "broadcast",
+      event: "game:host-transfer",
+      payload: { newHostId: targetPlayerId },
+    })
+    const targetName = players.find((p) => p.id === targetPlayerId)?.pseudo
+    toast.success(targetName ? `${targetName} est maintenant le chef du salon` : "Droits transférés")
+  }, [currentPlayer, roomCode, players])
+
+  const kickPlayer = useCallback((targetPlayerId: string) => {
+    if (!currentPlayer?.isHost || !channelRef.current) return
+    if (targetPlayerId === currentPlayer.id) return
+    const targetName = players.find((p) => p.id === targetPlayerId)?.pseudo
+    channelRef.current.send({
+      type: "broadcast",
+      event: "game:kick",
+      payload: { targetPlayerId },
+    })
+    setPlayers((prev) => prev.filter((p) => p.id !== targetPlayerId))
+    toast.success(targetName ? `${targetName} a été exclu du salon` : "Joueur exclu")
+  }, [currentPlayer, players])
+
   const leaveRoom = useCallback(async () => {
     sessionStorage.removeItem(SESSION_STORAGE_KEY)
     if (typeof window !== "undefined") {
       window.history.replaceState(null, "", "/")
     }
+    if (currentPlayer?.isHost && roomCode) {
+      const otherPlayers = players.filter((p) => p.id !== currentPlayer.id)
+      if (otherPlayers.length > 0) {
+        const nextHost = otherPlayers[0]
+        await supabase.from("rooms").update({ host_id: nextHost.id }).eq("code", roomCode)
+        channelRef.current?.send({
+          type: "broadcast",
+          event: "game:host-transfer",
+          payload: { newHostId: nextHost.id },
+        })
+      } else {
+        await supabase.from("rooms").delete().eq("code", roomCode)
+      }
+    }
     if (channelRef.current) {
       await channelRef.current.untrack()
       supabase.removeChannel(channelRef.current)
       channelRef.current = null
-    }
-    if (currentPlayer?.isHost && roomCode) {
-      await supabase.from("rooms").delete().eq("code", roomCode)
     }
     setPhase("home")
     setCurrentPlayer(null)
@@ -1043,7 +1188,7 @@ export function useGameRoom() {
     setRoundStartedAt(undefined)
     setChatMessages([])
     currentAssignmentsRef.current = {}
-  }, [currentPlayer, roomCode])
+  }, [currentPlayer, roomCode, players])
 
   // Library management
   const createLibrary = useCallback((name: string) => {
@@ -1108,23 +1253,52 @@ export function useGameRoom() {
     })
   }, [])
 
-  // Refresh meme functionality
+  // Refresh meme functionality (with back/forward navigation across already-unlocked memes)
   const refreshMeme = useCallback(() => {
-    if (refreshesLeft <= 0 || !selectedPack || hasSubmitted) return
+    if (hasSubmitted || !selectedPack) return
+
+    // If the player went back in history, "Changer" moves forward for free before drawing a new meme
+    if (memeHistoryIndex < memeHistory.length - 1) {
+      const nextIndex = memeHistoryIndex + 1
+      setMemeHistoryIndex(nextIndex)
+      setMyMemeUrl(memeHistory[nextIndex])
+      return
+    }
+
+    if (refreshesLeft <= 0) return
 
     let available = selectedPack.memes.filter(
-      (url) => !usedMemeUrlsRef.current.has(url) && url !== myMemeUrl
+      (url) => !usedMemeUrlsRef.current.has(url) && !memeHistory.includes(url) && url !== myMemeUrl
     )
     if (available.length === 0) {
-      available = selectedPack.memes.filter((url) => url !== myMemeUrl)
-      if (available.length === 0) available = selectedPack.memes
+      available = selectedPack.memes.filter((url) => !memeHistory.includes(url) && url !== myMemeUrl)
+      if (available.length === 0) {
+        available = selectedPack.memes.filter((url) => url !== myMemeUrl)
+        if (available.length === 0) available = selectedPack.memes
+      }
     }
 
     const newMemeUrl = available[Math.floor(Math.random() * available.length)]
     usedMemeUrlsRef.current.add(newMemeUrl)
     setMyMemeUrl(newMemeUrl)
+    setMemeHistory((prev) => {
+      const base = prev.length > 0 ? prev : myMemeUrl ? [myMemeUrl] : []
+      const next = [...base, newMemeUrl]
+      setMemeHistoryIndex(next.length - 1)
+      return next
+    })
     setRefreshesLeft((prev) => prev - 1)
-  }, [refreshesLeft, selectedPack, myMemeUrl, hasSubmitted])
+  }, [refreshesLeft, selectedPack, myMemeUrl, hasSubmitted, memeHistory, memeHistoryIndex])
+
+  const previousMeme = useCallback(() => {
+    if (hasSubmitted || memeHistoryIndex <= 0) return
+    const prevIndex = memeHistoryIndex - 1
+    setMemeHistoryIndex(prevIndex)
+    setMyMemeUrl(memeHistory[prevIndex])
+  }, [hasSubmitted, memeHistory, memeHistoryIndex])
+
+  const canGoBackMeme = memeHistoryIndex > 0
+  const canGoForwardMeme = memeHistoryIndex < memeHistory.length - 1
 
   // Send live chat message
   const sendChatMessage = useCallback((text: string) => {
@@ -1219,11 +1393,11 @@ export function useGameRoom() {
     sendDuelEvent, subscribeDuelEvents,
     sendVoteReaction, subscribeVoteReactions,
     heartRedistribution,
-    createRoom, joinRoom, leaveRoom,
+    createRoom, joinRoom, leaveRoom, transferHost, kickPlayer,
     updateSettings, selectPack, startGame,
     submitMeme, moveToVoting, vote,
     advanceMeme, nextRound, newGame,
-    refreshMeme, refreshesLeft,
+    refreshMeme, previousMeme, canGoBackMeme, canGoForwardMeme, refreshesLeft,
     setError,
     createLibrary, deleteLibrary, addMemeToLibrary, removeMemeFromLibrary, hydrateLibraries,
     addNicheToPool, removeNicheFromPool, clearNichePool,

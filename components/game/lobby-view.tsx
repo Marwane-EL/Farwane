@@ -3,9 +3,9 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import {
-  Copy, Check, Play, LogOut, Crown, Loader2, Package, ChevronDown, Settings, Timer, Hash, Users, Sparkles, AlertCircle, RefreshCw
+  Copy, Check, Play, LogOut, Crown, Loader2, Package, ChevronDown, Settings, Timer, Hash, Users, Sparkles, AlertCircle, RefreshCw, UserX
 } from "lucide-react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel,
@@ -32,6 +32,9 @@ interface LobbyViewProps {
   onClearNiches?: () => void
   onStartGame: () => void
   onLeave: () => void
+  onTransferHost?: (playerId: string) => void
+  onKickPlayer?: (playerId: string) => void
+  onOpenFriends?: () => void
 }
 
 export function LobbyView({
@@ -39,8 +42,24 @@ export function LobbyView({
   userLibraries, selectedPack, settings,
   nichePool, personalNiches,
   onSelectPack, onUpdateSettings, onAddNiche, onRemoveNiche, onClearNiches, onStartGame, onLeave,
+  onTransferHost, onKickPlayer, onOpenFriends,
 }: LobbyViewProps) {
   const [copied, setCopied] = useState(false)
+  const [contextMenu, setContextMenu] = useState<{ player: Player; x: number; y: number } | null>(null)
+
+  useEffect(() => {
+    if (!contextMenu) return
+    const close = () => setContextMenu(null)
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close()
+    }
+    window.addEventListener("click", close)
+    window.addEventListener("keydown", onKeyDown)
+    return () => {
+      window.removeEventListener("click", close)
+      window.removeEventListener("keydown", onKeyDown)
+    }
+  }, [contextMenu])
 
   const copyCode = async () => {
     try {
@@ -108,16 +127,42 @@ export function LobbyView({
             {/* Joueurs Card */}
             <Card className="border-2 border-border shadow-[4px_4px_0px_var(--border)] flex-1 min-h-0 flex flex-col">
               <CardContent className="p-3 sm:p-4 flex flex-col h-full min-h-0">
-                <h2 className="text-xs sm:text-sm font-black uppercase tracking-widest text-center mb-3 text-muted-foreground flex items-center justify-center gap-2 shrink-0">
-                  <Users className="h-4 w-4 text-primary" />
-                  Joueurs ({players.length}/{settings.maxPlayers})
-                </h2>
+                <div className="flex items-center justify-between gap-2 mb-1 shrink-0">
+                  <h2 className="text-xs sm:text-sm font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                    <Users className="h-4 w-4 text-primary" />
+                    Joueurs ({players.length}/{settings.maxPlayers})
+                  </h2>
+                  {onOpenFriends && (
+                    <button
+                      type="button"
+                      onClick={onOpenFriends}
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg border-2 border-primary/40 bg-primary/15 hover:bg-primary/25 text-primary text-[11px] font-black transition-all"
+                    >
+                      <Users className="w-3 h-3" />
+                      Inviter un ami
+                    </button>
+                  )}
+                </div>
+                {isHost && players.length > 1 && (
+                  <p className="text-[10px] text-center text-muted-foreground/75 mb-2 shrink-0">
+                    Clic droit sur un joueur pour gérer (hôte / exclure)
+                  </p>
+                )}
 
                 <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3 flex-1 min-h-0 overflow-y-auto pt-2.5 px-1 pb-1">
-                  {players.map((player, index) => (
+                  {players.map((player, index) => {
+                    const canManage = isHost && player.id !== currentPlayer?.id
+                    return (
                     <div
                       key={player.id}
-                      className={`animate-in fade-in zoom-in-95 duration-300 relative ${player.isHost ? "z-20" : "z-0"}`}
+                      onContextMenu={(e) => {
+                        if (!canManage) return
+                        e.preventDefault()
+                        const x = Math.min(e.clientX, window.innerWidth - 220)
+                        const y = Math.min(e.clientY, window.innerHeight - 110)
+                        setContextMenu({ player, x, y })
+                      }}
+                      className={`animate-in fade-in zoom-in-95 duration-300 relative ${player.isHost ? "z-20" : "z-0"} ${canManage ? "cursor-context-menu" : ""}`}
                       style={{ animationDelay: `${index * 80}ms` }}
                     >
                       <div
@@ -143,7 +188,8 @@ export function LobbyView({
                         )}
                       </div>
                     </div>
-                  ))}
+                  )
+                  })}
 
                   {Array.from({ length: Math.max(0, 3 - players.length) }).map((_, i) => (
                     <div
@@ -507,6 +553,45 @@ export function LobbyView({
           </div>
         </div>
       </div>
+
+      {/* Host Right-Click Context Menu */}
+      {contextMenu && (
+        <div
+          style={{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }}
+          onClick={(e) => e.stopPropagation()}
+          className="fixed z-50 w-52 rounded-xl border-2 border-primary bg-card p-1.5 shadow-[4px_4px_0px_oklch(0.75_0.25_300_/_0.45)] animate-in fade-in zoom-in-95 duration-100"
+        >
+          <div className="px-2.5 py-1.5 text-[11px] font-black text-muted-foreground border-b border-border/50 truncate mb-1">
+            {contextMenu.player.pseudo}
+          </div>
+          {onTransferHost && (
+            <button
+              type="button"
+              onClick={() => {
+                onTransferHost(contextMenu.player.id)
+                setContextMenu(null)
+              }}
+              className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-bold hover:bg-primary/15 hover:text-primary transition-colors text-left"
+            >
+              <Crown className="w-3.5 h-3.5 text-secondary shrink-0" />
+              <span>Transférer le chef</span>
+            </button>
+          )}
+          {onKickPlayer && (
+            <button
+              type="button"
+              onClick={() => {
+                onKickPlayer(contextMenu.player.id)
+                setContextMenu(null)
+              }}
+              className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-bold text-destructive hover:bg-destructive/15 transition-colors text-left"
+            >
+              <UserX className="w-3.5 h-3.5 shrink-0" />
+              <span>Virer du salon</span>
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }

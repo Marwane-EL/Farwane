@@ -250,16 +250,25 @@ export function DownloadMemeButton({ meme, className = "", showLabel = false }: 
 
           const stream = canvas.captureStream(30)
 
-          // Attach audio track from video if available
+          // Route audio through an AudioContext MediaStreamDestination (without connecting to speakers!)
+          // so the recorded file keeps its sound while the user's speakers stay completely silent.
+          let audioCtx: AudioContext | null = null
           try {
-            const vWithCapture = video as HTMLVideoElement & {
-              captureStream?: () => MediaStream
-              mozCaptureStream?: () => MediaStream
+            const AudioContextClass =
+              window.AudioContext ||
+              (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+            if (AudioContextClass) {
+              audioCtx = new AudioContextClass()
+              const sourceNode = audioCtx.createMediaElementSource(video)
+              const destNode = audioCtx.createMediaStreamDestination()
+              sourceNode.connect(destNode)
+              destNode.stream.getAudioTracks().forEach((t) => stream.addTrack(t))
+            } else {
+              video.muted = true
             }
-            const vStream = vWithCapture.captureStream?.() ?? vWithCapture.mozCaptureStream?.()
-            vStream?.getAudioTracks().forEach((t) => stream.addTrack(t))
           } catch {
-            // Audio capture not supported on this browser; continue with video
+            // Fallback: mute speaker output if AudioContext capture fails
+            video.muted = true
           }
 
           const chunks: BlobPart[] = []
@@ -285,6 +294,9 @@ export function DownloadMemeButton({ meme, className = "", showLabel = false }: 
 
           recorder.start()
           try {
+            if (audioCtx && audioCtx.state === "suspended") {
+              await audioCtx.resume()
+            }
             await video.play()
           } catch {
             video.muted = true
@@ -303,6 +315,9 @@ export function DownloadMemeButton({ meme, className = "", showLabel = false }: 
           cancelAnimationFrame(rafId)
           video.pause()
           recorder.stop()
+          if (audioCtx) {
+            audioCtx.close().catch(() => {})
+          }
 
           const videoBlob = await recordDone
           const url = URL.createObjectURL(videoBlob)
