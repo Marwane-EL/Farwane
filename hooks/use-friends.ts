@@ -5,6 +5,12 @@ import { supabase } from "@/lib/supabase"
 import type { RealtimeChannel } from "@supabase/supabase-js"
 import type { FriendProfile, FriendshipEntry, UserProfile } from "@/types/game"
 import { toast } from "sonner"
+import {
+  showFriendSuccessToast,
+  showIncomingFriendRequestToast,
+  showRoomInviteSentToast,
+  showRoomInviteToast,
+} from "@/components/game/friend-toasts"
 
 interface RawFriendshipRow {
   id: string
@@ -120,6 +126,60 @@ export function useFriends(
     loadFriendships()
   }, [loadFriendships])
 
+  const acceptFriendRequest = useCallback(
+    async (friendshipId: string, requesterUserId: string) => {
+      if (!profile?.id) return
+      const { error } = await supabase
+        .from("friendships")
+        .update({ status: "accepted" })
+        .eq("id", friendshipId)
+
+      if (error) {
+        toast.error("Impossible d'accepter la demande")
+        return
+      }
+
+      await loadFriendships()
+      channelRef.current?.send({
+        type: "broadcast",
+        event: "friend:refresh",
+        payload: {
+          targetUserId: requesterUserId,
+          fromUserId: profile.id,
+          fromPseudo: profile.pseudo,
+          fromAvatar: profile.avatar,
+          kind: "accepted",
+        },
+      })
+      showFriendSuccessToast("Nouvel ami !", "Demande d'ami acceptée", profile.avatar, "emerald")
+    },
+    [profile?.id, profile?.pseudo, profile?.avatar, loadFriendships]
+  )
+
+  const removeFriendship = useCallback(
+    async (friendshipId: string, otherUserId: string) => {
+      if (!profile?.id) return
+      const { error } = await supabase
+        .from("friendships")
+        .delete()
+        .eq("id", friendshipId)
+
+      if (error) {
+        toast.error("Impossible de supprimer cette relation")
+        return
+      }
+
+      await loadFriendships()
+      channelRef.current?.send({
+        type: "broadcast",
+        event: "friend:refresh",
+        payload: { targetUserId: otherUserId },
+      })
+      toast.success("Liste d'amis mise à jour")
+    },
+    [profile?.id, loadFriendships]
+  )
+
   // Subscribe to global friends channel for online presence + live invites
   useEffect(() => {
     if (!profile?.id) {
@@ -143,26 +203,48 @@ export function useFriends(
     channel.on("broadcast", { event: "friend:refresh" }, ({ payload }) => {
       if (payload?.targetUserId !== profile.id) return
       loadFriendships()
-      if (payload?.fromPseudo && payload?.kind === "request") {
-        toast.info(`${payload.fromPseudo} t'a envoyé une demande d'ami !`)
-      } else if (payload?.fromPseudo && payload?.kind === "accepted") {
-        toast.success(`${payload.fromPseudo} a accepté ta demande d'ami !`)
+
+      const fromPseudo = (payload?.fromPseudo as string) || "Un joueur"
+      const fromAvatar = (payload?.fromAvatar as string) || "🎮"
+      const fromUserId = payload?.fromUserId as string | undefined
+      const friendshipId = payload?.friendshipId as string | undefined
+
+      if (payload?.kind === "request") {
+        showIncomingFriendRequestToast({
+          fromPseudo,
+          fromAvatar,
+          onAccept:
+            friendshipId && fromUserId
+              ? () => acceptFriendRequest(friendshipId, fromUserId)
+              : undefined,
+          onDecline:
+            friendshipId && fromUserId
+              ? () => removeFriendship(friendshipId, fromUserId)
+              : undefined,
+        })
+      } else if (payload?.kind === "accepted") {
+        showFriendSuccessToast(
+          "Demande acceptée !",
+          `${fromPseudo} est maintenant ton ami`,
+          fromAvatar,
+          "emerald"
+        )
       }
     })
 
     channel.on("broadcast", { event: "room:invite" }, ({ payload }) => {
       if (payload?.targetUserId !== profile.id) return
       const fromPseudo = (payload?.fromPseudo as string) || "Un ami"
+      const fromAvatar = (payload?.fromAvatar as string) || "🎮"
       const invitedRoomCode = (payload?.roomCode as string) || ""
       if (!invitedRoomCode) return
 
-      toast.info(`${fromPseudo} t'invite à rejoindre son salon !`, {
-        duration: 12000,
-        action: {
-          label: "Rejoindre",
-          onClick: () => {
-            onAcceptInviteRef.current?.(invitedRoomCode)
-          },
+      showRoomInviteToast({
+        fromPseudo,
+        fromAvatar,
+        roomCode: invitedRoomCode,
+        onJoin: () => {
+          onAcceptInviteRef.current?.(invitedRoomCode)
         },
       })
     })
@@ -181,7 +263,7 @@ export function useFriends(
       supabase.removeChannel(channel)
       channelRef.current = null
     }
-  }, [profile?.id, profile?.pseudo, loadFriendships])
+  }, [profile?.id, profile?.pseudo, loadFriendships, acceptFriendRequest, removeFriendship])
 
   const searchPlayersByPseudo = useCallback(
     async (query: string): Promise<FriendProfile[]> => {
@@ -215,11 +297,15 @@ export function useFriends(
         return false
       }
 
-      const { error } = await supabase.from("friendships").insert({
-        requester_id: profile.id,
-        addressee_id: targetUserId,
-        status: "pending",
-      })
+      const { data: inserted, error } = await supabase
+        .from("friendships")
+        .insert({
+          requester_id: profile.id,
+          addressee_id: targetUserId,
+          status: "pending",
+        })
+        .select("id")
+        .single()
 
       if (error) {
         toast.error("Impossible d'envoyer la demande d'ami")
@@ -232,66 +318,30 @@ export function useFriends(
         event: "friend:refresh",
         payload: {
           targetUserId,
+          friendshipId: inserted?.id,
+          fromUserId: profile.id,
           fromPseudo: profile.pseudo,
+          fromAvatar: profile.avatar,
           kind: "request",
         },
       })
-      toast.success("Demande d'ami envoyée !")
+      showFriendSuccessToast(
+        "Demande envoyée !",
+        "Ton invitation d'ami a bien été transmise",
+        profile.avatar,
+        "purple"
+      )
       return true
     },
-    [profile?.id, profile?.pseudo, friends, incomingRequests, outgoingRequests, loadFriendships]
-  )
-
-  const acceptFriendRequest = useCallback(
-    async (friendshipId: string, requesterUserId: string) => {
-      if (!profile?.id) return
-      const { error } = await supabase
-        .from("friendships")
-        .update({ status: "accepted" })
-        .eq("id", friendshipId)
-
-      if (error) {
-        toast.error("Impossible d'accepter la demande")
-        return
-      }
-
-      await loadFriendships()
-      channelRef.current?.send({
-        type: "broadcast",
-        event: "friend:refresh",
-        payload: {
-          targetUserId: requesterUserId,
-          fromPseudo: profile.pseudo,
-          kind: "accepted",
-        },
-      })
-      toast.success("Demande d'ami acceptée !")
-    },
-    [profile?.id, profile?.pseudo, loadFriendships]
-  )
-
-  const removeFriendship = useCallback(
-    async (friendshipId: string, otherUserId: string) => {
-      if (!profile?.id) return
-      const { error } = await supabase
-        .from("friendships")
-        .delete()
-        .eq("id", friendshipId)
-
-      if (error) {
-        toast.error("Impossible de supprimer cette relation")
-        return
-      }
-
-      await loadFriendships()
-      channelRef.current?.send({
-        type: "broadcast",
-        event: "friend:refresh",
-        payload: { targetUserId: otherUserId },
-      })
-      toast.success("Liste d'amis mise à jour")
-    },
-    [profile?.id, loadFriendships]
+    [
+      profile?.id,
+      profile?.pseudo,
+      profile?.avatar,
+      friends,
+      incomingRequests,
+      outgoingRequests,
+      loadFriendships,
+    ]
   )
 
   const sendRoomInvite = useCallback(
@@ -303,12 +353,14 @@ export function useFriends(
         payload: {
           targetUserId: friendUserId,
           fromPseudo: profile.pseudo,
+          fromAvatar: profile.avatar,
           roomCode: activeRoomCode,
         },
       })
-      toast.success(`Invitation envoyée à ${friendPseudo} !`)
+      const friendEntry = friends.find((f) => f.user.id === friendUserId)
+      showRoomInviteSentToast(friendPseudo, friendEntry?.user.avatar)
     },
-    [profile]
+    [profile, friends]
   )
 
   return {

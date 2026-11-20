@@ -58,6 +58,14 @@ function isVideoFile(url: string): boolean {
   return /\.(mp4|webm|mov)(\?|$)/i.test(url)
 }
 
+function isRenderableBgImage(url: string): boolean {
+  if (!url || !/^https?:\/\//i.test(url)) return false
+  if (isVideoFile(url)) return false
+  // Unresolved Tenor/Giphy HTML pages cannot be rendered directly inside <img>
+  if (/tenor\.com\/view\//i.test(url)) return false
+  return true
+}
+
 function randomBetween(min: number, max: number): number {
   return Math.round(min + Math.random() * (max - min))
 }
@@ -85,7 +93,27 @@ export function FloatingMemesBg({
 }) {
   const [items, setItems] = useState<FloatingItem[]>([])
   const [particles, setParticles] = useState<Particle[]>([])
+  const [failedIndices, setFailedIndices] = useState<Set<number>>(new Set())
   const initializedRef = useRef(false)
+  const fallbackPoolRef = useRef<string[]>([])
+  const usedUrlsRef = useRef<Set<string>>(new Set())
+
+  const handleMediaError = (idx: number) => {
+    // Try replacing with an unused valid image from the pool before hiding the slot
+    const replacement = fallbackPoolRef.current.find((u) => !usedUrlsRef.current.has(u))
+    if (replacement) {
+      usedUrlsRef.current.add(replacement)
+      setItems((prev) =>
+        prev.map((it, i) => (i === idx ? { ...it, url: replacement, isVideo: false } : it))
+      )
+    } else {
+      setFailedIndices((prev) => {
+        const next = new Set(prev)
+        next.add(idx)
+        return next
+      })
+    }
+  }
 
   // Generate particles once on mount (independent of memeUrls)
   useEffect(() => {
@@ -109,11 +137,13 @@ export function FloatingMemesBg({
     initializedRef.current = true
 
     const COUNT = 6
-    const imageUrls = memeUrls.filter((u) => !isVideoFile(u))
-    const pool = imageUrls.length >= COUNT ? imageUrls : memeUrls
+    const imageUrls = memeUrls.filter(isRenderableBgImage)
+    if (imageUrls.length === 0) return
 
-    const shuffled = [...pool].sort(() => Math.random() - 0.5)
+    const shuffled = [...imageUrls].sort(() => Math.random() - 0.5)
+    fallbackPoolRef.current = shuffled
     const picked = shuffled.slice(0, COUNT)
+    usedUrlsRef.current = new Set(picked)
 
     const built: FloatingItem[] = picked.map((url, idx) => {
       // 1 occasional looping meme, 1 occasional 2000km/h turbo meme, rest calm
@@ -189,6 +219,7 @@ export function FloatingMemesBg({
 
       {/* Floating random memes/GIFs with subtle stardust trail (home only) */}
       {showMemes && items.map((item, idx) => {
+        if (failedIndices.has(idx)) return null
         const animClass =
           item.mode === "loop"
             ? "anim-float-looping"
@@ -255,6 +286,7 @@ export function FloatingMemesBg({
                   muted
                   playsInline
                   preload="metadata"
+                  onError={() => handleMediaError(idx)}
                   className="w-full h-full object-cover"
                 />
               ) : (
@@ -263,6 +295,7 @@ export function FloatingMemesBg({
                   src={item.url}
                   alt=""
                   loading="lazy"
+                  onError={() => handleMediaError(idx)}
                   className="w-full h-full object-cover"
                 />
               )}
