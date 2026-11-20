@@ -1,0 +1,31 @@
+name: Daily Media Health Check
+
+on:
+  schedule:
+    # 11:00 UTC = 12:00 Paris (heure d'hiver) / 13:00 (heure d'été)
+    - cron: "0 11 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Mode simulation (1 = rapport seul, 0 = suppression auto)"
+        required: false
+        default: "0"
+
+jobs:
+  check-media:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Check & clean dead media links in Supabase
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || '0' }}
+        run: node scripts/check-media-health.mjs

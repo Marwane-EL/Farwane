@@ -5,7 +5,7 @@ import NextLink from "next/link"
 import {
   Shield, LogOut, Plus, Trash2, ChevronDown, ChevronUp,
   Eye, EyeOff, Package, ImageIcon, X, Loader2,
-  Upload, Sparkles, Check, AlertCircle, RefreshCw, Link, Copy, Wand2, Home
+  Upload, Sparkles, Check, AlertCircle, RefreshCw, Link, Copy, Wand2, Home, HeartPulse
 } from "lucide-react"
 import { getApiBase } from "@/lib/utils"
 
@@ -788,6 +788,14 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [error, setError] = useState("")
+  const [checkingHealth, setCheckingHealth] = useState(false)
+  const [healthReport, setHealthReport] = useState<{
+    checkedUrls: number
+    removedCount: number
+    packsUpdated: number
+    checkedAt: string
+    brokenItems: { packName: string; url: string; reason: string }[]
+  } | null>(null)
 
   const loadPacks = useCallback(async () => {
     setLoading(true)
@@ -806,6 +814,34 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   }, [onLogout])
 
   useEffect(() => { loadPacks() }, [loadPacks])
+
+  const runHealthCheck = async () => {
+    setCheckingHealth(true)
+    setError("")
+    try {
+      const res = await adminFetch("/api/admin/health-check", { method: "POST" })
+      if (res.status === 401) { onLogout(); return }
+      const data = await res.json()
+      if (res.ok) {
+        setHealthReport({
+          checkedUrls: data.checkedUrls ?? 0,
+          removedCount: data.removedCount ?? 0,
+          packsUpdated: data.packsUpdated ?? 0,
+          checkedAt: data.checkedAt ?? new Date().toISOString(),
+          brokenItems: data.brokenItems ?? [],
+        })
+        if (data.removedCount > 0) {
+          await loadPacks()
+        }
+      } else {
+        setError(data.error ?? "Erreur lors de la vérification des liens")
+      }
+    } catch {
+      setError("Erreur réseau lors de la vérification")
+    } finally {
+      setCheckingHealth(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -875,19 +911,71 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         </div>
 
         {/* Actions bar */}
-        <div className="flex items-center justify-between mb-4 animate-in fade-in duration-500 delay-200">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-4 animate-in fade-in duration-500 delay-200">
           <h2 className="text-base font-bold flex items-center gap-2">
             <Package className="w-4 h-4 text-primary" />
             Packs de mèmes
           </h2>
-          <button
-            onClick={() => setShowCreate(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-primary to-primary/80 text-primary-foreground font-bold text-sm hover:from-primary/90 hover:to-primary/70 transition-all duration-300 hover:scale-105 shadow-lg shadow-primary/30"
-          >
-            <Plus className="w-4 h-4" />
-            Nouveau pack
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={runHealthCheck}
+              disabled={checkingHealth || loading}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl border-2 border-emerald-500/50 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 font-bold text-sm transition-all disabled:opacity-50"
+              title="Vérifier et nettoyer les vidéos/images cassées maintenant"
+            >
+              {checkingHealth ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <HeartPulse className="w-4 h-4" />
+              )}
+              <span>{checkingHealth ? "Vérification..." : "Vérifier les médias"}</span>
+            </button>
+            <button
+              onClick={() => setShowCreate(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-primary to-primary/80 text-primary-foreground font-bold text-sm hover:from-primary/90 hover:to-primary/70 transition-all duration-300 hover:scale-105 shadow-lg shadow-primary/30"
+            >
+              <Plus className="w-4 h-4" />
+              Nouveau pack
+            </button>
+          </div>
         </div>
+
+        {/* Health Check Result Banner */}
+        {healthReport && (
+          <div className="mb-4 p-4 rounded-xl border-2 border-emerald-500/40 bg-emerald-500/10 text-sm animate-in fade-in duration-300">
+            <div className="flex items-center justify-between gap-2">
+              <div className="font-bold text-emerald-300 flex items-center gap-2">
+                <Check className="w-4 h-4 shrink-0" />
+                {healthReport.removedCount === 0 ? (
+                  <span>
+                    Tous les médias sont valides ({healthReport.checkedUrls} URLs vérifiées) !
+                  </span>
+                ) : (
+                  <span>
+                    {healthReport.removedCount} lien{healthReport.removedCount > 1 ? "s" : ""} mort{healthReport.removedCount > 1 ? "s" : ""} supprimé{healthReport.removedCount > 1 ? "s" : ""} dans {healthReport.packsUpdated} pack{healthReport.packsUpdated > 1 ? "s" : ""} ({healthReport.checkedUrls} URLs vérifiées)
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setHealthReport(null)}
+                className="p-1 rounded-lg hover:bg-muted/50 text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            {healthReport.brokenItems.length > 0 && (
+              <div className="mt-2 max-h-36 overflow-y-auto space-y-1 text-xs text-muted-foreground border-t border-emerald-500/20 pt-2">
+                {healthReport.brokenItems.map((item, i) => (
+                  <div key={i} className="truncate">
+                    <span className="font-bold text-destructive">[{item.reason}]</span>{" "}
+                    <span className="font-semibold text-foreground">{item.packName}</span> — {item.url}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Packs list */}
         <div className="space-y-3 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-300">
